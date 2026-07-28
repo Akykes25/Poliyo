@@ -1,0 +1,16 @@
+{
+  "name": "Poliyo.Content",
+  "rootNamespace": "Poliyo.Content",
+  "references": [
+    "Poliyo.Core"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
