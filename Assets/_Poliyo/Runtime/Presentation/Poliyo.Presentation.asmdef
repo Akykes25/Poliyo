@@ -1,0 +1,32 @@
+{
+    "name":  "Poliyo.Presentation",
+    "rootNamespace":  "Poliyo.Presentation",
+    "references":  [
+                       "Poliyo.Application",
+                       "Poliyo.Simulation",
+                       "Poliyo.Content",
+                       "Poliyo.Core",
+                       "Unity.InputSystem",
+                       "Unity.ugui",
+                       "Unity.TextMeshPro"
+                   ],
+    "includePlatforms":  [
+
+                         ],
+    "excludePlatforms":  [
+
+                         ],
+    "allowUnsafeCode":  false,
+    "overrideReferences":  false,
+    "precompiledReferences":  [
+
+                              ],
+    "autoReferenced":  false,
+    "defineConstraints":  [
+
+                          ],
+    "versionDefines":  [
+
+                       ],
+    "noEngineReferences":  false
+}

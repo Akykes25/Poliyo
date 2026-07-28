@@ -8,5 +8,20 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 8c9cfa26abfee488c85f1582747f6a02
+  - enabled: 1
+    path: Assets/_Poliyo/Scenes/MainMenu.unity
+    guid: e0b3f84f05ccf2f449b17269f391a94f
+  - enabled: 1
+    path: Assets/_Poliyo/Scenes/CampaignCalendar.unity
+    guid: 74071256326a25c40a19ebdbe0fe8d09
+  - enabled: 1
+    path: Assets/_Poliyo/Scenes/CampaignMap.unity
+    guid: deb1ee438fd54544f816e4f7aad7bbc7
+  - enabled: 1
+    path: Assets/_Poliyo/Scenes/TeamScene.unity
+    guid: 9838c753d55ddc34d931bcaf1a4a7a66
+  - enabled: 1
+    path: Assets/_Poliyo/Scenes/CampaignSlice.unity
+    guid: e07f4498e7bf4e547b458edc48c6e9b5
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}

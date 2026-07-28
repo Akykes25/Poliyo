@@ -1,0 +1,19 @@
+{
+  "name": "Poliyo.Application",
+  "rootNamespace": "Poliyo.Application",
+  "references": [
+    "Poliyo.Core",
+    "Poliyo.Simulation",
+    "Poliyo.Content",
+    "Poliyo.AI"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

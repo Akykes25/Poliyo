@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="CampaignShell.uss" />
+    <ui:VisualElement name="campaign-shell" class="campaign-shell">
+        <ui:VisualElement class="header">
+            <ui:Label text="POLIYO" class="brand" />
+            <ui:VisualElement class="header-status">
+                <ui:Label name="day-label" text="Día 1" class="header-item" />
+                <ui:Label name="time-label" text="Mañana" class="header-item" />
+                <ui:Label name="funds-label" text="Fondos: $0" class="header-item" />
+                <ui:Label name="fog-label" text="Información abierta" class="header-item" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="navigation-bar">
+            <ui:Button name="calendar-button" text="Calendario" class="nav-button" />
+            <ui:Button name="map-button" text="Mapa" class="nav-button" />
+            <ui:Button name="team-button" text="Equipo" class="nav-button" />
+            <ui:VisualElement class="nav-spacer" />
+            <ui:Label name="selected-territory-label" text="Foco: nacional" class="territory-label" />
+            <ui:Button name="press-button" text="Prensa" class="press-button" />
+        </ui:VisualElement>
+        <ui:VisualElement class="content-area">
+            <ui:VisualElement class="workspace-panel">
+                <ui:Label name="screen-title" text="Mesa de campaña" class="screen-title" />
+                <ui:Label name="screen-description" text="Planificá la semana, asigná tareas y respondé al país." class="screen-description" />
+                <ui:Label name="status-label" text="La campaña está lista para comenzar." class="status-message" />
+                <ui:ScrollView name="context-content" class="context-content" mode="Vertical" />
+                <ui:VisualElement class="activity-row">
+                    <ui:Button name="rally-button" text="Acto" class="activity-button" />
+                    <ui:Button name="interview-button" text="Entrevista" class="activity-button" />
+                    <ui:Button name="negotiation-button" text="Negociación" class="activity-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="national-summary">
+                <ui:Label text="Resumen nacional" class="panel-title" />
+                <ui:Label name="trust-label" text="Confianza: sin datos" class="summary-value" />
+                <ui:Label text="Antes de la Niebla se muestra confianza agregada; después sólo una lectura cualitativa." class="summary-description" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="news-ticker">
+            <ui:Label text="Noticias" class="news-label" />
+            <ui:Label name="news-headline" text="La jornada comienza sin incidentes reportados." class="news-headline" />
+        </ui:VisualElement>
+        <ui:VisualElement class="action-bar">
+            <ui:Label name="phase-label" text="Mesa semanal" class="phase-label" />
+            <ui:Button name="next-day-button" text="Siguiente día" class="next-day-button" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

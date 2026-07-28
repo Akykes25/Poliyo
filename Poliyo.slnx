@@ -1,2 +1,10 @@
 ﻿<Solution>
+  <Project Path="Poliyo.Core.EditModeTests.csproj" />
+  <Project Path="Poliyo.Application.csproj" />
+  <Project Path="Poliyo.Presentation.csproj" />
+  <Project Path="Poliyo.Simulation.csproj" />
+  <Project Path="Poliyo.Presentation.Editor.csproj" />
+  <Project Path="Poliyo.Core.csproj" />
+  <Project Path="Poliyo.AI.csproj" />
+  <Project Path="Poliyo.Content.csproj" />
 </Solution>
