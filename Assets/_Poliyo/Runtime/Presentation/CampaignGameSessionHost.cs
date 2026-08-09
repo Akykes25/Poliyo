@@ -30,6 +30,7 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
     public CampaignSimulationSession Session => _session ?? throw new InvalidOperationException("No active campaign session exists.");
     public CampaignContentDefinition ContentCatalog => _contentCatalog;
     public string SelectedJurisdictionId => _selectedJurisdictionId;
+    public bool HasAutosave => _saveRepository != null && _saveRepository.Exists(AutosaveSlotId);
 
     public void Configure(CampaignContentDefinition contentCatalog, ulong seed, float initialFunds)
     {
@@ -76,8 +77,11 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
             return;
         }
 
-        _session = CreateSession(_saveRepository.Load(AutosaveSlotId));
-        _selectedJurisdictionId = null;
+        CampaignSaveData savedCampaign = _saveRepository.Load(AutosaveSlotId);
+        _session = CreateSession(savedCampaign);
+        _selectedJurisdictionId = IsKnownJurisdiction(savedCampaign.SelectedJurisdictionId)
+            ? savedCampaign.SelectedJurisdictionId
+            : null;
         NotifyStateChanged();
     }
 
@@ -97,9 +101,23 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
         return result;
     }
 
+    public void AssignTeamTask(string memberId, DelegatedTaskType taskType, string targetId)
+    {
+        Session.AssignTeamTask(memberId, taskType, targetId);
+        SaveAutosave();
+        NotifyStateChanged();
+    }
+
     public void SelectJurisdiction(string jurisdictionId)
     {
-        _selectedJurisdictionId = string.IsNullOrWhiteSpace(jurisdictionId) ? null : jurisdictionId;
+        string selection = string.IsNullOrWhiteSpace(jurisdictionId) ? null : jurisdictionId;
+        if (selection != null && !IsKnownJurisdiction(selection))
+        {
+            throw new ArgumentException("The selected jurisdiction does not exist in the campaign catalog.", nameof(jurisdictionId));
+        }
+
+        _selectedJurisdictionId = selection;
+        SaveAutosave();
         NotifyStateChanged();
     }
 
@@ -146,12 +164,21 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
         CampaignRuntime runtime = savedCampaign != null
             ? CampaignRuntime.Restore(savedCampaign, CreateCommitments())
             : CreateRuntime();
-        var session = new CampaignSimulationSession(runtime, electorate, CreateTeam(), new NewsMemory());
+        int electionRulesVersion = savedCampaign == null
+            ? CampaignSaveData.CurrentElectionRulesVersion
+            : savedCampaign.ElectionRulesVersion;
+        var session = new CampaignSimulationSession(
+            runtime,
+            electorate,
+            CreateTeam(),
+            new NewsMemory(),
+            electionRulesVersion);
         if (savedCampaign != null)
         {
             session.RestoreActivityLimits(savedCampaign);
             session.RestoreTeam(savedCampaign);
             session.RestoreNews(savedCampaign);
+            session.RestoreElectionResult(savedCampaign);
         }
 
         return session;
@@ -203,7 +230,27 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
 
     private void SaveAutosave()
     {
-        _saveRepository.Save(AutosaveSlotId, Session.CreateSaveData());
+        CampaignSaveData saveData = Session.CreateSaveData();
+        saveData.SelectedJurisdictionId = _selectedJurisdictionId;
+        _saveRepository.Save(AutosaveSlotId, saveData);
+    }
+
+    private bool IsKnownJurisdiction(string jurisdictionId)
+    {
+        if (string.IsNullOrWhiteSpace(jurisdictionId) || _contentCatalog == null)
+        {
+            return false;
+        }
+
+        foreach (LocalityDefinition locality in _contentCatalog.Localities)
+        {
+            if (locality != null && locality.JurisdictionId == jurisdictionId)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void NotifyStateChanged()

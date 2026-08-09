@@ -6,7 +6,9 @@ namespace Poliyo.Application
 [Serializable]
 public sealed class CampaignSaveData
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
+    public const int LegacyElectionRulesVersion = 0;
+    public const int CurrentElectionRulesVersion = 1;
 
     public int SchemaVersion = CurrentSchemaVersion;
     public ulong Seed;
@@ -17,9 +19,12 @@ public sealed class CampaignSaveData
     public int LastActionDay;
     public int ActivityWeek;
     public int PublicActivitiesThisWeek;
+    public int ElectionRulesVersion = CurrentElectionRulesVersion;
+    public string SelectedJurisdictionId;
     public ElectorSaveData[] Electorate = Array.Empty<ElectorSaveData>();
     public TeamMemberSaveData[] TeamMembers = Array.Empty<TeamMemberSaveData>();
     public NewsItemSaveData[] NewsItems = Array.Empty<NewsItemSaveData>();
+    public ElectionResultSaveData ElectionResult;
 }
 
 [Serializable]
@@ -71,5 +76,37 @@ public sealed class NewsItemSaveData
     public decimal Reach;
     public decimal Framing;
     public decimal CurrentIntensity;
+}
+
+[Serializable]
+public sealed class ElectionResultSaveData
+{
+    public ElectionTallySaveData Tally;
+    public ElectionOutcomeSaveData Outcome;
+}
+
+[Serializable]
+public sealed class ElectionTallySaveData
+{
+    public CandidateVoteSaveData[] CandidateVotes = Array.Empty<CandidateVoteSaveData>();
+    public decimal ParticipatingWeight;
+    public decimal ValidVotes;
+    public decimal BlankVotes;
+    public decimal UndecidedVotes;
+}
+
+[Serializable]
+public sealed class CandidateVoteSaveData
+{
+    public string CandidateId;
+    public decimal Votes;
+}
+
+[Serializable]
+public sealed class ElectionOutcomeSaveData
+{
+    public string WinnerId;
+    public string RunoffFirstId;
+    public string RunoffSecondId;
 }
 }

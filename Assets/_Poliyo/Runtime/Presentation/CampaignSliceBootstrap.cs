@@ -41,12 +41,21 @@ public sealed class CampaignSliceBootstrap : MonoBehaviour
         CampaignRuntime runtime = savedCampaign != null
             ? CampaignRuntime.Restore(savedCampaign, _commitments)
             : CreateNewCampaign();
-        _session = new CampaignSimulationSession(runtime, electorate, CreateTeam(), new NewsMemory());
+        int electionRulesVersion = savedCampaign == null
+            ? CampaignSaveData.CurrentElectionRulesVersion
+            : savedCampaign.ElectionRulesVersion;
+        _session = new CampaignSimulationSession(
+            runtime,
+            electorate,
+            CreateTeam(),
+            new NewsMemory(),
+            electionRulesVersion);
         if (savedCampaign != null)
         {
             _session.RestoreActivityLimits(savedCampaign);
             _session.RestoreTeam(savedCampaign);
             _session.RestoreNews(savedCampaign);
+            _session.RestoreElectionResult(savedCampaign);
         }
 
         if (_canvasController == null)
