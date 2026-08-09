@@ -28,7 +28,9 @@ public static class ElectionOutcomeCalculator
 
         var firstShare = tally.GetValidVoteShare(first);
         var secondShare = tally.GetValidVoteShare(second);
-        var winsFirstRound = firstShare > 45m || (firstShare >= 40m && firstShare - secondShare >= 10m);
+        bool hasStrictLead = firstShare > secondShare;
+        var winsFirstRound = hasStrictLead &&
+                             (firstShare > 45m || (firstShare >= 40m && firstShare - secondShare >= 10m));
 
         return winsFirstRound
             ? new ElectionOutcome(first, null, null)

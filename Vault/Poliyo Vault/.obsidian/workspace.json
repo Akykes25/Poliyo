@@ -13,6 +13,20 @@
             "state": {
               "type": "markdown",
               "state": {
+                "file": "01 Arquitectura/Poliyo - Estado actual y pendientes.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Poliyo - Estado actual y pendientes"
+            }
+          },
+          {
+            "id": "a106c1052fbe713d",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
                 "file": "Bienvenido.md",
                 "mode": "source",
                 "source": false
@@ -21,7 +35,8 @@
               "title": "Bienvenido"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -183,8 +198,35 @@
       "bases:Crear nueva base": false
     }
   },
-  "active": "f2508dc537f91207",
+  "active": "3cc541d361f95428",
   "lastOpenFiles": [
-    "Bienvenido.md"
+    "99 Plantillas/Plantilla - Nota de sistema.md",
+    "05 Decisiones/Decisiones técnicas.md",
+    "06 QA/Bugs conocidos.md",
+    "06 QA/Plan de pruebas.md",
+    "04 Producción/Backlog.md",
+    "04 Producción/Roadmap.md",
+    "02 Diseño/Sistemas/Índice de sistemas.md",
+    "01 Inicio/Poliyo - Dashboard.md",
+    "98 Exportaciones/Poliyo - GDD Maestro.docx",
+    "99 Plantillas",
+    "90 Archivo/Arquitectura/Poliyo - Arquitectura inicial.md",
+    "90 Archivo/Arquitectura",
+    "90 Archivo/GDD/Poliyo - GDD v1.0 - 2026-07-21.md",
+    "90 Archivo/GDD",
+    "04 Producción/Hitos",
+    "04 Producción",
+    "03 Técnica/Poliyo - Arquitectura técnica.md",
+    "03 Técnica/Persistencia",
+    "03 Técnica/Módulos",
+    "03 Técnica/Integraciones Unity",
+    "03 Técnica",
+    "90 Archivo MD/Sin título.md",
+    "Bienvenido.md",
+    "00 Inbox/Anotaciones.md",
+    "90 Archivo/GDD-work.md",
+    "01 Inicio/Poliyo - Estado actual y pendientes.md",
+    "02 Diseño/Poliyo - GDD Maestro.md",
+    "03 tecnica/Poliyo - Arquitectura técnica.md"
   ]
 }

@@ -8,17 +8,30 @@ namespace Poliyo.Application
 public sealed class CampaignSimulationSession
 {
     private readonly CampaignElectionService _electionService;
+    private readonly int _electionRulesVersion;
     private CampaignElectionResult _electionResult;
     private int _lastActionDay;
     private int _activityWeek;
     private int _publicActivitiesThisWeek;
 
-    public CampaignSimulationSession(CampaignRuntime runtime, IReadOnlyList<MicroElector> electorate, CampaignTeam team, NewsMemory news)
+    public CampaignSimulationSession(
+        CampaignRuntime runtime,
+        IReadOnlyList<MicroElector> electorate,
+        CampaignTeam team,
+        NewsMemory news,
+        int electionRulesVersion = CampaignSaveData.CurrentElectionRulesVersion)
     {
         Runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         Electorate = electorate ?? throw new ArgumentNullException(nameof(electorate));
         Team = team ?? throw new ArgumentNullException(nameof(team));
         News = news ?? throw new ArgumentNullException(nameof(news));
+        if (electionRulesVersion < CampaignSaveData.LegacyElectionRulesVersion ||
+            electionRulesVersion > CampaignSaveData.CurrentElectionRulesVersion)
+        {
+            throw new NotSupportedException($"Election rules version {electionRulesVersion} is not supported.");
+        }
+
+        _electionRulesVersion = electionRulesVersion;
         _electionService = new CampaignElectionService(CampaignCandidateIds.All);
     }
 
@@ -27,15 +40,28 @@ public sealed class CampaignSimulationSession
     public CampaignTeam Team { get; }
     public NewsMemory News { get; }
     public CampaignElectionResult ElectionResult => _electionResult;
+    public bool CanAssignTeamTask => !AreCampaignActionsLockedByElection;
+    public bool CanResolvePublicAction
+    {
+        get
+        {
+            int currentDay = Runtime.State.Calendar.CurrentDay;
+            int currentWeek = Runtime.State.Calendar.CurrentWeek;
+            int activitiesThisWeek = _activityWeek == currentWeek ? _publicActivitiesThisWeek : 0;
+            return !AreCampaignActionsLockedByElection && _lastActionDay != currentDay && activitiesThisWeek < 3;
+        }
+    }
 
     public CampaignSaveData CreateSaveData()
     {
         CampaignSaveData saveData = CampaignSaveMapper.Create(Runtime, Electorate);
+        saveData.ElectionRulesVersion = _electionRulesVersion;
         saveData.LastActionDay = _lastActionDay;
         saveData.ActivityWeek = _activityWeek;
         saveData.PublicActivitiesThisWeek = _publicActivitiesThisWeek;
         saveData.TeamMembers = CreateTeamSaveData();
         saveData.NewsItems = CampaignSaveMapper.CreateNewsData(News.Items);
+        saveData.ElectionResult = CampaignSaveMapper.CreateElectionResultData(_electionResult);
         return saveData;
     }
 
@@ -86,8 +112,40 @@ public sealed class CampaignSimulationSession
         News.Restore(CampaignSaveMapper.RestoreNews(saveData));
     }
 
+    public void RestoreElectionResult(CampaignSaveData saveData)
+    {
+        CampaignElectionResult restoredResult = CampaignSaveMapper.RestoreElectionResult(saveData);
+        if (saveData.ElectionRulesVersion != _electionRulesVersion)
+        {
+            throw new InvalidOperationException("The session and save use different election rules versions.");
+        }
+
+        if (_electionResult != null)
+        {
+            return;
+        }
+
+        if (restoredResult != null)
+        {
+            _electionResult = restoredResult;
+            CompleteElectionPhase(_electionResult);
+            return;
+        }
+
+        if (Runtime.State.Calendar.IsElectionDay && Electorate.Count > 0)
+        {
+            _electionResult = ResolveConfiguredFirstRound();
+            CompleteElectionPhase(_electionResult);
+        }
+    }
+
     public void AssignTeamTask(string memberId, DelegatedTaskType taskType, string targetId)
     {
+        if (!CanAssignTeamTask)
+        {
+            throw new InvalidOperationException("Campaign team tasks cannot be assigned on or after election day.");
+        }
+
         Team.Assign(Runtime.State.Calendar.CurrentDay, memberId, taskType, targetId);
     }
 
@@ -95,6 +153,11 @@ public sealed class CampaignSimulationSession
     {
         int currentDay = Runtime.State.Calendar.CurrentDay;
         int currentWeek = Runtime.State.Calendar.CurrentWeek;
+        if (AreCampaignActionsLockedByElection)
+        {
+            throw new InvalidOperationException("Public campaign activities cannot be resolved on or after election day.");
+        }
+
         if (_lastActionDay == currentDay)
         {
             throw new InvalidOperationException("Only one public campaign activity can be resolved per day.");
@@ -144,8 +207,54 @@ public sealed class CampaignSimulationSession
             return new CampaignDayAdvanceResult(monthlyClose, taskCauses, null, true);
         }
 
-        _electionResult = _electionService.ResolveFirstRound(Runtime.State, Electorate);
+        _electionResult = ResolveConfiguredFirstRound();
+        CompleteElectionPhase(_electionResult);
         return new CampaignDayAdvanceResult(monthlyClose, taskCauses, _electionResult, false);
+    }
+
+    private void CompleteElectionPhase(CampaignElectionResult electionResult)
+    {
+        CampaignPhase currentPhase = Runtime.PhaseMachine.Current;
+        if (currentPhase == CampaignPhase.ElectionDay)
+        {
+            Runtime.PhaseMachine.MoveTo(CampaignPhase.Scrutiny);
+            currentPhase = CampaignPhase.Scrutiny;
+        }
+
+        CampaignPhase expectedPhase = electionResult.Outcome.RequiresRunoff
+            ? CampaignPhase.Runoff
+            : CampaignPhase.Finished;
+        if (currentPhase == CampaignPhase.Scrutiny)
+        {
+            Runtime.PhaseMachine.MoveTo(expectedPhase);
+            return;
+        }
+
+        if (currentPhase != expectedPhase)
+        {
+            throw new InvalidOperationException("The campaign phase is incompatible with the restored election outcome.");
+        }
+    }
+
+    private CampaignElectionResult ResolveConfiguredFirstRound()
+    {
+        return _electionRulesVersion == CampaignSaveData.LegacyElectionRulesVersion
+            ? _electionService.ResolveFirstRoundLegacy(Runtime.State, Electorate)
+            : _electionService.ResolveFirstRound(Runtime.State, Electorate);
+    }
+
+    private bool AreCampaignActionsLockedByElection
+    {
+        get
+        {
+            CampaignPhase phase = Runtime.PhaseMachine.Current;
+            return _electionResult != null ||
+                   Runtime.State.Calendar.IsElectionDay ||
+                   phase == CampaignPhase.ElectionDay ||
+                   phase == CampaignPhase.Scrutiny ||
+                   phase == CampaignPhase.Runoff ||
+                   phase == CampaignPhase.Finished;
+        }
     }
 
     private TeamMemberSaveData[] CreateTeamSaveData()

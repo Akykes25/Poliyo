@@ -4,7 +4,10 @@
     "references":  [
                        "Poliyo.Core",
                        "Poliyo.Simulation",
-                       "Poliyo.Application"
+                       "Poliyo.Application",
+                       "Poliyo.Presentation",
+                       "Unity.ugui",
+                       "Unity.TextMeshPro"
                    ],
     "includePlatforms":  [
                              "Editor"

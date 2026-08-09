@@ -117,6 +117,60 @@ public static class CampaignSaveMapper
         return data.ToArray();
     }
 
+    public static ElectionResultSaveData CreateElectionResultData(CampaignElectionResult electionResult)
+    {
+        if (electionResult == null) return null;
+
+        var candidateVotes = new List<CandidateVoteSaveData>(electionResult.Tally.CandidateVotes.Count);
+        foreach (KeyValuePair<string, decimal> candidateVote in electionResult.Tally.CandidateVotes)
+        {
+            candidateVotes.Add(new CandidateVoteSaveData
+            {
+                CandidateId = candidateVote.Key,
+                Votes = candidateVote.Value,
+            });
+        }
+
+        return new ElectionResultSaveData
+        {
+            Tally = new ElectionTallySaveData
+            {
+                CandidateVotes = candidateVotes.ToArray(),
+                ParticipatingWeight = electionResult.Tally.ParticipatingWeight,
+                ValidVotes = electionResult.Tally.ValidVotes,
+                BlankVotes = electionResult.Tally.BlankVotes,
+                UndecidedVotes = electionResult.Tally.UndecidedVotes,
+            },
+            Outcome = new ElectionOutcomeSaveData
+            {
+                WinnerId = electionResult.Outcome.WinnerId,
+                RunoffFirstId = electionResult.Outcome.RunoffFirstId,
+                RunoffSecondId = electionResult.Outcome.RunoffSecondId,
+            },
+        };
+    }
+
+    public static CampaignElectionResult RestoreElectionResult(CampaignSaveData saveData)
+    {
+        Validate(saveData);
+        if (saveData.ElectionResult == null) return null;
+
+        ElectionTallySaveData tallyData = saveData.ElectionResult.Tally;
+        var tally = new ElectionTally();
+        tally.AddParticipation(tallyData.ParticipatingWeight);
+        foreach (CandidateVoteSaveData candidateVote in tallyData.CandidateVotes)
+        {
+            tally.AddCandidateVotes(candidateVote.CandidateId, candidateVote.Votes);
+        }
+
+        tally.AddBlankVotes(tallyData.BlankVotes);
+        tally.AddUndecidedVotes(tallyData.UndecidedVotes);
+
+        ElectionOutcomeSaveData outcomeData = saveData.ElectionResult.Outcome;
+        var outcome = new ElectionOutcome(outcomeData.WinnerId, outcomeData.RunoffFirstId, outcomeData.RunoffSecondId);
+        return new CampaignElectionResult(tally, outcome);
+    }
+
     public static void Validate(CampaignSaveData saveData)
     {
         if (saveData == null) throw new ArgumentNullException(nameof(saveData));
@@ -145,6 +199,24 @@ public static class CampaignSaveMapper
         {
             throw new InvalidOperationException("The save contains a missing collection.");
         }
+
+        if (saveData.ElectionResult != null && saveData.CurrentDay != CampaignCalendar.TotalCampaignDays)
+        {
+            throw new InvalidOperationException("The save contains an election result before election day.");
+        }
+
+        if (saveData.SelectedJurisdictionId != null && string.IsNullOrWhiteSpace(saveData.SelectedJurisdictionId))
+        {
+            throw new InvalidOperationException("The save contains an invalid selected jurisdiction.");
+        }
+
+        if (saveData.ElectionRulesVersion < CampaignSaveData.LegacyElectionRulesVersion ||
+            saveData.ElectionRulesVersion > CampaignSaveData.CurrentElectionRulesVersion)
+        {
+            throw new NotSupportedException($"Election rules version {saveData.ElectionRulesVersion} is not supported.");
+        }
+
+        ValidateElectionResultData(saveData.ElectionResult);
     }
 
     private static void MigrateInPlace(CampaignSaveData saveData)
@@ -165,6 +237,95 @@ public static class CampaignSaveMapper
         {
             saveData.SchemaVersion = 4;
             saveData.NewsItems = Array.Empty<NewsItemSaveData>();
+        }
+
+        if (saveData.SchemaVersion == 4)
+        {
+            saveData.SchemaVersion = 5;
+            saveData.ElectionRulesVersion = CampaignSaveData.LegacyElectionRulesVersion;
+            saveData.ElectionResult = null;
+        }
+    }
+
+    private static void ValidateElectionResultData(ElectionResultSaveData electionResult)
+    {
+        if (electionResult == null) return;
+        if (electionResult.Tally == null || electionResult.Outcome == null)
+        {
+            throw new InvalidOperationException("The save contains an incomplete election result.");
+        }
+
+        ElectionTallySaveData tally = electionResult.Tally;
+        if (tally.CandidateVotes == null)
+        {
+            throw new InvalidOperationException("The save contains a missing election vote collection.");
+        }
+
+        if (tally.ParticipatingWeight < 0m || tally.ValidVotes < 0m || tally.BlankVotes < 0m || tally.UndecidedVotes < 0m)
+        {
+            throw new InvalidOperationException("The save contains invalid election totals.");
+        }
+
+        var candidateIds = new HashSet<string>(StringComparer.Ordinal);
+        decimal calculatedValidVotes = 0m;
+        foreach (CandidateVoteSaveData candidateVote in tally.CandidateVotes)
+        {
+            if (candidateVote == null || string.IsNullOrWhiteSpace(candidateVote.CandidateId) || candidateVote.Votes < 0m)
+            {
+                throw new InvalidOperationException("The save contains an invalid candidate vote total.");
+            }
+
+            if (!candidateIds.Add(candidateVote.CandidateId))
+            {
+                throw new InvalidOperationException("The save contains duplicate candidate vote totals.");
+            }
+
+            calculatedValidVotes += candidateVote.Votes;
+        }
+
+        if (candidateIds.Count < 2)
+        {
+            throw new InvalidOperationException("The save contains too few candidates for an election result.");
+        }
+
+        if (calculatedValidVotes != tally.ValidVotes)
+        {
+            throw new InvalidOperationException("The save contains an inconsistent valid vote total.");
+        }
+
+        if (tally.ValidVotes + tally.BlankVotes + tally.UndecidedVotes != tally.ParticipatingWeight)
+        {
+            throw new InvalidOperationException("The save contains an inconsistent election participation total.");
+        }
+
+        ElectionOutcomeSaveData outcome = electionResult.Outcome;
+        ValidateOptionalCandidateId(outcome.WinnerId);
+        ValidateOptionalCandidateId(outcome.RunoffFirstId);
+        ValidateOptionalCandidateId(outcome.RunoffSecondId);
+
+        if (outcome.WinnerId != null)
+        {
+            if (outcome.RunoffFirstId != null || outcome.RunoffSecondId != null || !candidateIds.Contains(outcome.WinnerId))
+            {
+                throw new InvalidOperationException("The save contains an invalid first-round election outcome.");
+            }
+
+            return;
+        }
+
+        if (outcome.RunoffFirstId == null || outcome.RunoffSecondId == null ||
+            outcome.RunoffFirstId == outcome.RunoffSecondId ||
+            !candidateIds.Contains(outcome.RunoffFirstId) || !candidateIds.Contains(outcome.RunoffSecondId))
+        {
+            throw new InvalidOperationException("The save contains an invalid runoff election outcome.");
+        }
+    }
+
+    private static void ValidateOptionalCandidateId(string candidateId)
+    {
+        if (candidateId != null && string.IsNullOrWhiteSpace(candidateId))
+        {
+            throw new InvalidOperationException("The save contains an invalid election candidate id.");
         }
     }
 

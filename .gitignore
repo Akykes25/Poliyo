@@ -105,3 +105,19 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# Vault
+/Vault
+
+# Inteligencia Artificial
+/.codex
+/.agents
+/.vscode
+
+#Documentos
+/Docs
+/dox-qa-render
+/docx-qa-temp
+
+# Referencias
+/Referencias
