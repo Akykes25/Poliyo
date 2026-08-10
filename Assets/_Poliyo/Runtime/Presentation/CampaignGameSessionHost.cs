@@ -19,6 +19,11 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
     [SerializeField] private ulong _seed = 20260725UL;
     [SerializeField] private float _initialFunds = 1200f;
 
+    [Header("Campaign testing")]
+    [SerializeField, Range(1, CampaignCalendar.TotalCampaignDays)]
+    [Tooltip("Only new campaigns are simulated up to this day. Loaded autosaves always keep their saved day.")]
+    private int _newCampaignStartDay = 1;
+
     private JsonCampaignSaveRepository _saveRepository;
     private CampaignSimulationSession _session;
     private string _selectedJurisdictionId;
@@ -180,8 +185,21 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
             session.RestoreNews(savedCampaign);
             session.RestoreElectionResult(savedCampaign);
         }
+        else
+        {
+            AdvanceNewCampaignToConfiguredDay(session);
+        }
 
         return session;
+    }
+
+    private void AdvanceNewCampaignToConfiguredDay(CampaignSimulationSession session)
+    {
+        int targetDay = Mathf.Clamp(_newCampaignStartDay, 1, CampaignCalendar.TotalCampaignDays);
+        while (session.Runtime.State.Calendar.CurrentDay < targetDay)
+        {
+            session.AdvanceDay();
+        }
     }
 
     private CampaignRuntime CreateRuntime()

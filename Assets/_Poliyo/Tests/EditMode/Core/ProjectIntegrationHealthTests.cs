@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using Poliyo.Presentation;
+using Poliyo.Simulation;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -73,6 +75,101 @@ public sealed class ProjectIntegrationHealthTests
                 CountMissingScripts(scene),
                 Is.Zero,
                 $"'{scenePath}' contains missing MonoBehaviour scripts."));
+    }
+
+    [TestCaseSource(nameof(CanonicalScenePaths))]
+    public void CanonicalScene_WhenOpened_HasOneActiveOrthographicMainCamera(string scenePath)
+    {
+        WithPreviewScene(scenePath, scene =>
+        {
+            Camera camera = GetSingleComponent<Camera>(scene);
+
+            Assert.That(camera.gameObject.scene, Is.EqualTo(scene));
+            Assert.That(camera.gameObject.activeInHierarchy, Is.True);
+            Assert.That(camera.enabled, Is.True);
+            Assert.That(camera.CompareTag("MainCamera"), Is.True);
+            Assert.That(camera.orthographic, Is.True);
+            Assert.That(camera.targetDisplay, Is.Zero);
+            Assert.That(camera.rect, Is.EqualTo(new Rect(0f, 0f, 1f, 1f)));
+            Assert.That(camera.GetComponent<AudioListener>(), Is.Not.Null);
+            Assert.That(
+                camera.GetComponents<Component>().Any(component =>
+                    component != null && component.GetType().Name == "UniversalAdditionalCameraData"),
+                Is.True,
+                $"'{scenePath}' camera must include URP additional camera data.");
+        });
+    }
+
+    [TestCaseSource(nameof(CanonicalScenePaths))]
+    public void CanonicalScene_WhenOpened_UsesResponsiveCanvasScaling(string scenePath)
+    {
+        WithPreviewScene(scenePath, scene =>
+        {
+            Canvas[] rootCanvases = GetRootCanvases(scene);
+            Assert.That(rootCanvases, Has.Length.EqualTo(1), $"'{scenePath}' must have exactly one root Canvas.");
+
+            Canvas canvas = rootCanvases[0];
+            CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
+            Assert.That(canvas.renderMode, Is.EqualTo(RenderMode.ScreenSpaceOverlay));
+            Assert.That(canvas.GetComponent<GraphicRaycaster>(), Is.Not.Null);
+            Assert.That(scaler, Is.Not.Null);
+            Assert.That(scaler.uiScaleMode, Is.EqualTo(CanvasScaler.ScaleMode.ScaleWithScreenSize));
+            Assert.That(scaler.referenceResolution, Is.EqualTo(new Vector2(1920f, 1080f)));
+            Assert.That(scaler.screenMatchMode, Is.EqualTo(CanvasScaler.ScreenMatchMode.Expand));
+        });
+    }
+
+    [TestCase(MainMenuScenePath, "MenuFrame")]
+    [TestCase(MainMenuScenePath, "RoscaliaBrief")]
+    [TestCase(CampaignSliceScenePath, "CampaignMasthead")]
+    [TestCase(CampaignSliceScenePath, "CampaignDesk")]
+    [TestCase(CampaignSliceScenePath, "NationalPulse")]
+    [TestCase(CampaignSliceScenePath, "Panel_Noticias")]
+    [TestCase(CampaignCalendarScenePath, "CampaignChrome")]
+    [TestCase(CampaignCalendarScenePath, "CalendarPanel")]
+    [TestCase(CampaignCalendarScenePath, "CalendarActions")]
+    [TestCase(CampaignCalendarScenePath, "InterviewDrawer")]
+    [TestCase(CampaignMapScenePath, "CampaignChrome")]
+    [TestCase(CampaignMapScenePath, "RoscaliaMap")]
+    [TestCase(CampaignMapScenePath, "ZoneDetailsDrawer")]
+    [TestCase(TeamScenePath, "CampaignChrome")]
+    [TestCase(TeamScenePath, "TeamRoster")]
+    [TestCase(TeamScenePath, "TeamMemberDetail")]
+    [TestCase(TeamScenePath, "FinancingPanel")]
+    public void ResponsivePanel_WhenOpened_UsesProportionalStretchAnchors(string scenePath, string objectName)
+    {
+        WithPreviewScene(scenePath, scene =>
+        {
+            RectTransform rectTransform = GetSingleNamedComponent<RectTransform>(scene, objectName);
+
+            Assert.That(rectTransform.anchorMax.x, Is.GreaterThan(rectTransform.anchorMin.x));
+            Assert.That(rectTransform.anchorMax.y, Is.GreaterThan(rectTransform.anchorMin.y));
+            Assert.That(rectTransform.anchoredPosition, Is.EqualTo(Vector2.zero));
+            Assert.That(rectTransform.sizeDelta, Is.EqualTo(Vector2.zero));
+        });
+    }
+
+    [TestCaseSource(nameof(CanonicalScenePaths))]
+    public void CampaignGameSessionHost_WhenOpened_ExposesValidSerializedNewCampaignStartDay(string scenePath)
+    {
+        WithPreviewScene(scenePath, scene =>
+        {
+            CampaignGameSessionHost host = GetSingleComponent<CampaignGameSessionHost>(scene);
+            SerializedProperty startDay = new SerializedObject(host).FindProperty("_newCampaignStartDay");
+            FieldInfo field = typeof(CampaignGameSessionHost).GetField(
+                "_newCampaignStartDay",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.That(startDay, Is.Not.Null);
+            Assert.That(startDay.propertyType, Is.EqualTo(SerializedPropertyType.Integer));
+            Assert.That(startDay.intValue, Is.InRange(1, CampaignCalendar.TotalCampaignDays));
+            Assert.That(field, Is.Not.Null);
+            Assert.That(field.GetCustomAttribute<SerializeField>(), Is.Not.Null);
+            UnityEngine.RangeAttribute range = field.GetCustomAttribute<UnityEngine.RangeAttribute>();
+            Assert.That(range, Is.Not.Null);
+            Assert.That(range.min, Is.EqualTo(1f));
+            Assert.That(range.max, Is.EqualTo(CampaignCalendar.TotalCampaignDays));
+        });
     }
 
     [Test]
@@ -249,6 +346,18 @@ public sealed class ProjectIntegrationHealthTests
     {
         T[] components = GetComponentsInScene<T>(scene);
         Assert.That(components, Has.Length.EqualTo(1), $"Expected exactly one {typeof(T).Name} in '{scene.path}'.");
+        return components[0];
+    }
+
+    private static T GetSingleNamedComponent<T>(Scene scene, string objectName) where T : Component
+    {
+        T[] components = GetComponentsInScene<T>(scene)
+            .Where(component => component.gameObject.name == objectName)
+            .ToArray();
+        Assert.That(
+            components,
+            Has.Length.EqualTo(1),
+            $"Expected exactly one {typeof(T).Name} named '{objectName}' in '{scene.path}'.");
         return components[0];
     }
 
