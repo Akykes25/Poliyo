@@ -48,6 +48,36 @@ public sealed class CampaignSimulationSessionTests
     }
 
     [Test]
+    public void AdvanceDay_RepeatedFromCampaignStart_ReachesFogAndResolvesElectionAtDaySixty()
+    {
+        CampaignSimulationSession session = CreateSessionAtCampaignStart();
+
+        while (session.Runtime.State.Calendar.CurrentDay < CampaignCalendar.FogStartDay)
+        {
+            session.AdvanceDay();
+        }
+
+        Assert.That(session.Runtime.State.Calendar.CurrentDay, Is.EqualTo(CampaignCalendar.FogStartDay));
+        Assert.That(session.Runtime.PhaseMachine.Current, Is.EqualTo(CampaignPhase.ElectoralFog));
+        Assert.That(session.ElectionResult, Is.Null);
+
+        while (session.Runtime.State.Calendar.CurrentDay < CampaignCalendar.TotalCampaignDays - 1)
+        {
+            session.AdvanceDay();
+        }
+
+        Assert.That(session.Runtime.State.Calendar.CurrentDay, Is.EqualTo(CampaignCalendar.TotalCampaignDays - 1));
+        Assert.That(session.ElectionResult, Is.Null);
+
+        CampaignDayAdvanceResult electionDay = session.AdvanceDay();
+
+        Assert.That(session.Runtime.State.Calendar.CurrentDay, Is.EqualTo(CampaignCalendar.TotalCampaignDays));
+        Assert.That(electionDay.ElectionResult, Is.Not.Null);
+        Assert.That(session.ElectionResult, Is.SameAs(electionDay.ElectionResult));
+        Assert.That(session.Runtime.PhaseMachine.Current, Is.EqualTo(CampaignPhase.Finished));
+    }
+
+    [Test]
     public void AdvanceDay_WhenFirstRoundHasNoWinner_MovesCampaignToRunoff()
     {
         CampaignSimulationSession session = CreateSessionOnDayBeforeElection(requiresRunoff: true);
@@ -201,6 +231,29 @@ public sealed class CampaignSimulationSessionTests
             runtime,
             electorate,
             team ?? new CampaignTeam(new CampaignTeamMember[0]),
+            new NewsMemory());
+    }
+
+    private static CampaignSimulationSession CreateSessionAtCampaignStart()
+    {
+        var runtime = new CampaignRuntime(new CampaignSeed(3UL), 100m, new List<MonthlyCommitment>());
+        runtime.StartCampaign();
+        var electorate = new List<MicroElector>
+        {
+            new MicroElector("elector", "locality", 100m, 100m, new[]
+            {
+                new CandidateElectoralState(CampaignCandidateIds.Player, 50m, 50m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Liberales, 50m, 20m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Contr, 50m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Zurditos, 50m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Federales, 50m, 10m, 0m),
+            }),
+        };
+
+        return new CampaignSimulationSession(
+            runtime,
+            electorate,
+            new CampaignTeam(new CampaignTeamMember[0]),
             new NewsMemory());
     }
 
