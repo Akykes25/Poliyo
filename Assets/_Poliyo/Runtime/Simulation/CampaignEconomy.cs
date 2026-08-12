@@ -41,6 +41,12 @@ public sealed class CampaignEconomy
     public decimal UnpaidObligations { get; private set; }
     public IReadOnlyList<CampaignTransaction> Transactions => _transactions;
 
+    public bool CanAfford(decimal amount)
+    {
+        if (amount < 0m) throw new ArgumentOutOfRangeException(nameof(amount));
+        return Funds >= amount;
+    }
+
     public void AddIncome(int day, string sourceId, decimal amount)
     {
         var transaction = new CampaignTransaction(day, CampaignTransactionType.Income, sourceId, amount);

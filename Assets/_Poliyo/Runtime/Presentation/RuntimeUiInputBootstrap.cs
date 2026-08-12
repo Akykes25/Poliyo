@@ -16,9 +16,15 @@ internal static class RuntimeUiInputBootstrap
             eventSystem = eventSystemObject.AddComponent<EventSystem>();
         }
 
-        if (eventSystem.GetComponent<InputSystemUIInputModule>() == null)
+        InputSystemUIInputModule inputModule = eventSystem.GetComponent<InputSystemUIInputModule>();
+        if (inputModule == null)
         {
-            eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
+            inputModule = eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
+        }
+
+        if (inputModule.actionsAsset == null)
+        {
+            inputModule.AssignDefaultActions();
         }
     }
 }

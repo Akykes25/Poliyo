@@ -35,5 +35,21 @@ public sealed class CampaignState
 
         _causeRecords.Add(causeRecord);
     }
+
+    public void RestoreCauseRecords(IEnumerable<CauseRecord> causes)
+    {
+        if (causes == null) throw new ArgumentNullException(nameof(causes));
+        _causeRecords.Clear();
+        foreach (CauseRecord cause in causes)
+        {
+            if (cause == null) throw new ArgumentException("A cause is required.", nameof(causes));
+            if (cause.Day > Calendar.CurrentDay)
+            {
+                throw new InvalidOperationException("A restored cause cannot be from the future.");
+            }
+
+            _causeRecords.Add(cause);
+        }
+    }
 }
 }

@@ -22,15 +22,40 @@ public sealed class ProjectIntegrationHealthTests
     private const string CampaignCalendarScenePath = "Assets/_Poliyo/Scenes/CampaignCalendar.unity";
     private const string CampaignMapScenePath = "Assets/_Poliyo/Scenes/CampaignMap.unity";
     private const string TeamScenePath = "Assets/_Poliyo/Scenes/TeamScene.unity";
+    private const string TeamSelectionScenePath = "Assets/_Poliyo/Scenes/TeamSelection.unity";
+    private const string PoliticalRallyScenePath = "Assets/_Poliyo/Scenes/PoliticalRally.unity";
+    private const string InterviewScenePath = "Assets/_Poliyo/Scenes/Interview.unity";
+    private const string PoliticalNegotiationScenePath = "Assets/_Poliyo/Scenes/PoliticalNegotiation.unity";
     private const string SampleScenePath = "Assets/Scenes/SampleScene.unity";
 
     private static readonly string[] CanonicalScenePaths =
     {
         MainMenuScenePath,
+        TeamSelectionScenePath,
         CampaignSliceScenePath,
         CampaignCalendarScenePath,
         CampaignMapScenePath,
-        TeamScenePath
+        TeamScenePath,
+        PoliticalRallyScenePath,
+        InterviewScenePath,
+        PoliticalNegotiationScenePath
+    };
+
+    private static readonly string[] OrthographicScenePaths =
+    {
+        MainMenuScenePath,
+        TeamSelectionScenePath,
+        CampaignSliceScenePath,
+        CampaignCalendarScenePath,
+        CampaignMapScenePath,
+        TeamScenePath,
+    };
+
+    private static readonly string[] PerspectiveScenePaths =
+    {
+        PoliticalRallyScenePath,
+        InterviewScenePath,
+        PoliticalNegotiationScenePath,
     };
 
     [Test]
@@ -78,7 +103,7 @@ public sealed class ProjectIntegrationHealthTests
     }
 
     [TestCaseSource(nameof(CanonicalScenePaths))]
-    public void CanonicalScene_WhenOpened_HasOneActiveOrthographicMainCamera(string scenePath)
+    public void CanonicalScene_WhenOpened_HasOneActiveMainCamera(string scenePath)
     {
         WithPreviewScene(scenePath, scene =>
         {
@@ -88,7 +113,6 @@ public sealed class ProjectIntegrationHealthTests
             Assert.That(camera.gameObject.activeInHierarchy, Is.True);
             Assert.That(camera.enabled, Is.True);
             Assert.That(camera.CompareTag("MainCamera"), Is.True);
-            Assert.That(camera.orthographic, Is.True);
             Assert.That(camera.targetDisplay, Is.Zero);
             Assert.That(camera.rect, Is.EqualTo(new Rect(0f, 0f, 1f, 1f)));
             Assert.That(camera.GetComponent<AudioListener>(), Is.Not.Null);
@@ -97,6 +121,56 @@ public sealed class ProjectIntegrationHealthTests
                     component != null && component.GetType().Name == "UniversalAdditionalCameraData"),
                 Is.True,
                 $"'{scenePath}' camera must include URP additional camera data.");
+        });
+    }
+
+    [TestCaseSource(nameof(OrthographicScenePaths))]
+    public void TwoDimensionalScene_WhenOpened_UsesOrthographicCamera(string scenePath)
+    {
+        WithPreviewScene(scenePath, scene => Assert.That(GetSingleComponent<Camera>(scene).orthographic, Is.True));
+    }
+
+    [TestCaseSource(nameof(PerspectiveScenePaths))]
+    public void DecisionScene_WhenOpened_UsesPerspectiveCamera(string scenePath)
+    {
+        WithPreviewScene(scenePath, scene => Assert.That(GetSingleComponent<Camera>(scene).orthographic, Is.False));
+    }
+
+    [Test]
+    public void TeamSelectionScene_WhenOpened_HasRuntimeBootstrapAndHost()
+    {
+        WithPreviewScene(TeamSelectionScenePath, scene =>
+        {
+            VerticalSliceSceneBootstrap bootstrap = GetSingleComponent<VerticalSliceSceneBootstrap>(scene);
+            TeamSelectionScreenPresenter presenter = GetSingleComponent<TeamSelectionScreenPresenter>(scene);
+            CampaignGameSessionHost host = GetSingleComponent<CampaignGameSessionHost>(scene);
+
+            Assert.That(bootstrap.enabled, Is.True);
+            Assert.That(presenter.enabled, Is.True);
+            Assert.That(host.enabled, Is.True);
+            Assert.That(new SerializedObject(bootstrap).FindProperty("_sceneKind").intValue, Is.EqualTo(0));
+        });
+    }
+
+    [TestCase(PoliticalRallyScenePath, CampaignActivity.Rally)]
+    [TestCase(InterviewScenePath, CampaignActivity.Interview)]
+    [TestCase(PoliticalNegotiationScenePath, CampaignActivity.Negotiation)]
+    public void DecisionScene_WhenOpened_HasActivityPresenterAndRuntimeBootstrap(
+        string scenePath,
+        CampaignActivity expectedActivity)
+    {
+        WithPreviewScene(scenePath, scene =>
+        {
+            VerticalSliceSceneBootstrap bootstrap = GetSingleComponent<VerticalSliceSceneBootstrap>(scene);
+            CampaignDecisionScenePresenter presenter = GetSingleComponent<CampaignDecisionScenePresenter>(scene);
+            CampaignGameSessionHost host = GetSingleComponent<CampaignGameSessionHost>(scene);
+
+            Assert.That(bootstrap.enabled, Is.True);
+            Assert.That(presenter.enabled, Is.True);
+            Assert.That(host.enabled, Is.True);
+            Assert.That(
+                new SerializedObject(presenter).FindProperty("_activity").enumValueIndex,
+                Is.EqualTo((int)expectedActivity));
         });
     }
 

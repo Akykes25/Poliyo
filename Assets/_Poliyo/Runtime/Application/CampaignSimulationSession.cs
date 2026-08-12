@@ -13,13 +13,18 @@ public sealed class CampaignSimulationSession
     private int _lastActionDay;
     private int _activityWeek;
     private int _publicActivitiesThisWeek;
+    private bool _teamSelectionCompleted;
+    private readonly Dictionary<string, PoliticalRelationship> _relationships = new Dictionary<string, PoliticalRelationship>();
+    private readonly List<PoliticalPromise> _promises = new List<PoliticalPromise>();
+    private readonly List<CampaignDecisionRecord> _decisionRecords = new List<CampaignDecisionRecord>();
 
     public CampaignSimulationSession(
         CampaignRuntime runtime,
         IReadOnlyList<MicroElector> electorate,
         CampaignTeam team,
         NewsMemory news,
-        int electionRulesVersion = CampaignSaveData.CurrentElectionRulesVersion)
+        int electionRulesVersion = CampaignSaveData.CurrentElectionRulesVersion,
+        bool teamSelectionCompleted = true)
     {
         Runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         Electorate = electorate ?? throw new ArgumentNullException(nameof(electorate));
@@ -32,6 +37,7 @@ public sealed class CampaignSimulationSession
         }
 
         _electionRulesVersion = electionRulesVersion;
+        _teamSelectionCompleted = teamSelectionCompleted;
         _electionService = new CampaignElectionService(CampaignCandidateIds.All);
     }
 
@@ -40,7 +46,11 @@ public sealed class CampaignSimulationSession
     public CampaignTeam Team { get; }
     public NewsMemory News { get; }
     public CampaignElectionResult ElectionResult => _electionResult;
-    public bool CanAssignTeamTask => !AreCampaignActionsLockedByElection;
+    public bool TeamSelectionCompleted => _teamSelectionCompleted;
+    public IReadOnlyDictionary<string, PoliticalRelationship> Relationships => _relationships;
+    public IReadOnlyList<PoliticalPromise> Promises => _promises;
+    public IReadOnlyList<CampaignDecisionRecord> DecisionRecords => _decisionRecords;
+    public bool CanAssignTeamTask => _teamSelectionCompleted && !AreCampaignActionsLockedByElection;
     public bool CanResolvePublicAction
     {
         get
@@ -48,7 +58,7 @@ public sealed class CampaignSimulationSession
             int currentDay = Runtime.State.Calendar.CurrentDay;
             int currentWeek = Runtime.State.Calendar.CurrentWeek;
             int activitiesThisWeek = _activityWeek == currentWeek ? _publicActivitiesThisWeek : 0;
-            return !AreCampaignActionsLockedByElection && _lastActionDay != currentDay && activitiesThisWeek < 3;
+            return _teamSelectionCompleted && !AreCampaignActionsLockedByElection && _lastActionDay != currentDay && activitiesThisWeek < 3;
         }
     }
 
@@ -59,8 +69,13 @@ public sealed class CampaignSimulationSession
         saveData.LastActionDay = _lastActionDay;
         saveData.ActivityWeek = _activityWeek;
         saveData.PublicActivitiesThisWeek = _publicActivitiesThisWeek;
+        saveData.TeamSelectionCompleted = _teamSelectionCompleted;
         saveData.TeamMembers = CreateTeamSaveData();
         saveData.NewsItems = CampaignSaveMapper.CreateNewsData(News.Items);
+        saveData.Relationships = CampaignSaveMapper.CreateRelationshipData(_relationships.Values);
+        saveData.Promises = CampaignSaveMapper.CreatePromiseData(_promises);
+        saveData.DecisionRecords = CampaignSaveMapper.CreateDecisionRecordData(_decisionRecords);
+        saveData.CauseRecords = CampaignSaveMapper.CreateCauseData(Runtime.State.CauseRecords);
         saveData.ElectionResult = CampaignSaveMapper.CreateElectionResultData(_electionResult);
         return saveData;
     }
@@ -86,16 +101,29 @@ public sealed class CampaignSimulationSession
     public void RestoreTeam(CampaignSaveData saveData)
     {
         CampaignSaveMapper.Validate(saveData);
+        _teamSelectionCompleted = saveData.TeamSelectionCompleted;
         foreach (TeamMemberSaveData memberData in saveData.TeamMembers)
         {
-            if (memberData == null || memberData.Assignment == null)
+            if (memberData == null)
             {
                 continue;
             }
 
-            if (!Team.Members.TryGetValue(memberData.Id, out CampaignTeamMember member) || member.RoleId != memberData.RoleId)
+            string profileId = string.IsNullOrWhiteSpace(memberData.ProfileId) ? memberData.Id : memberData.ProfileId;
+            CampaignTeamMember member;
+            if (!Team.Members.TryGetValue(memberData.Id, out member))
+            {
+                member = new CampaignTeamMember(memberData.Id, memberData.RoleId, profileId);
+                Team.RestoreMember(member);
+            }
+            else if (member.RoleId != memberData.RoleId)
             {
                 throw new InvalidOperationException("The save references an incompatible campaign team member.");
+            }
+
+            if (memberData.Assignment == null)
+            {
+                continue;
             }
 
             if (!Enum.TryParse(memberData.Assignment.TaskType, out DelegatedTaskType taskType) || !Enum.IsDefined(typeof(DelegatedTaskType), taskType))
@@ -110,6 +138,48 @@ public sealed class CampaignSimulationSession
     public void RestoreNews(CampaignSaveData saveData)
     {
         News.Restore(CampaignSaveMapper.RestoreNews(saveData));
+    }
+
+    public void RestorePoliticalMemory(CampaignSaveData saveData)
+    {
+        CampaignSaveMapper.Validate(saveData);
+        _relationships.Clear();
+        foreach (PoliticalRelationship relationship in CampaignSaveMapper.RestoreRelationships(saveData))
+        {
+            _relationships.Add(relationship.ActorId, relationship);
+        }
+
+        _promises.Clear();
+        _promises.AddRange(CampaignSaveMapper.RestorePromises(saveData));
+        _decisionRecords.Clear();
+        _decisionRecords.AddRange(CampaignSaveMapper.RestoreDecisionRecords(saveData));
+        Runtime.State.RestoreCauseRecords(CampaignSaveMapper.RestoreCauses(saveData));
+    }
+
+    public void SelectTeamMember(string roleId, string profileId)
+    {
+        if (AreCampaignActionsLockedByElection)
+        {
+            throw new InvalidOperationException("The initial team cannot be changed after the election starts.");
+        }
+
+        if (_teamSelectionCompleted && Team.IsSelectionComplete)
+        {
+            throw new InvalidOperationException("The initial campaign team is already confirmed for this campaign.");
+        }
+
+        Team.SelectMember(roleId, profileId);
+        _teamSelectionCompleted = false;
+    }
+
+    public void FinalizeTeamSelection()
+    {
+        if (!Team.IsSelectionComplete)
+        {
+            throw new InvalidOperationException("The initial team must contain one selected profile for each required role.");
+        }
+
+        _teamSelectionCompleted = true;
     }
 
     public void RestoreElectionResult(CampaignSaveData saveData)
@@ -158,6 +228,11 @@ public sealed class CampaignSimulationSession
             throw new InvalidOperationException("Public campaign activities cannot be resolved on or after election day.");
         }
 
+        if (!_teamSelectionCompleted)
+        {
+            throw new InvalidOperationException("Choose and confirm the initial campaign team before resolving public activities.");
+        }
+
         if (_lastActionDay == currentDay)
         {
             throw new InvalidOperationException("Only one public campaign activity can be resolved per day.");
@@ -174,11 +249,87 @@ public sealed class CampaignSimulationSession
             throw new InvalidOperationException("The weekly public activity limit has been reached.");
         }
 
+        if (!Runtime.Economy.CanAfford(action.Cost))
+        {
+            return new CampaignActionResolution(false, Array.Empty<CauseRecord>());
+        }
+
         CampaignActionResolution result = CampaignActionResolver.Resolve(Runtime.State, Runtime.Economy, action, targets);
+        if (!result.WasPaid)
+        {
+            return result;
+        }
         News.Publish(CampaignNewsFactory.CreateForActivity(currentDay, action, result));
         _lastActionDay = currentDay;
         _publicActivitiesThisWeek++;
         return result;
+    }
+
+    public CampaignDecisionResolution ResolveDecision(CampaignDecisionPlan plan, IEnumerable<MicroElector> targets)
+    {
+        if (plan == null) throw new ArgumentNullException(nameof(plan));
+        if (targets == null) throw new ArgumentNullException(nameof(targets));
+        int currentDay = Runtime.State.Calendar.CurrentDay;
+        int currentWeek = Runtime.State.Calendar.CurrentWeek;
+        if (!CanResolvePublicAction)
+        {
+            throw new InvalidOperationException("This campaign cannot resolve another public decision today.");
+        }
+
+        if (!Runtime.Economy.CanAfford(plan.Cost))
+        {
+            var unaffordable = new CampaignActionResolution(false, Array.Empty<CauseRecord>());
+            return new CampaignDecisionResolution(unaffordable, null, Array.Empty<PoliticalRelationshipChange>(), Array.Empty<PoliticalPromise>());
+        }
+
+        CampaignActionResolution actionResolution = CampaignActionResolver.Resolve(Runtime.State, Runtime.Economy, plan.CreateActionDefinition(), targets);
+        if (!actionResolution.WasPaid)
+        {
+            return new CampaignDecisionResolution(actionResolution, null, Array.Empty<PoliticalRelationshipChange>(), Array.Empty<PoliticalPromise>());
+        }
+
+        var appliedChanges = new List<PoliticalRelationshipChange>();
+        foreach (PoliticalRelationshipChange change in plan.RelationshipChanges)
+        {
+            if (!_relationships.TryGetValue(change.ActorId, out PoliticalRelationship relationship))
+            {
+                relationship = new PoliticalRelationship(change.ActorId);
+                _relationships.Add(change.ActorId, relationship);
+            }
+
+            relationship.Apply(change.TrustDelta, change.AffinityDelta, change.ObligationDelta, change.GrievanceDelta);
+            appliedChanges.Add(change);
+            Runtime.State.RecordCause(new CauseRecord(currentDay, CauseCategory.PoliticalRelationship, plan.Id, change.ActorId, "relationship-change", change.TrustDelta + change.AffinityDelta + change.ObligationDelta - change.GrievanceDelta));
+        }
+
+        var createdPromises = new List<PoliticalPromise>();
+        foreach (CampaignPromiseDefinition definition in plan.Promises)
+        {
+            var promise = new PoliticalPromise(definition.Id, definition.CounterpartId, definition.Description, currentDay);
+            _promises.Add(promise);
+            createdPromises.Add(promise);
+            Runtime.State.RecordCause(new CauseRecord(currentDay, CauseCategory.PoliticalPromise, plan.Id, promise.CounterpartId, promise.Id, 1m));
+        }
+
+        var record = new CampaignDecisionRecord(
+            plan.Id + "-day-" + currentDay,
+            plan.Id,
+            currentDay,
+            plan.Activity,
+            plan.ActorId,
+            plan.Cost,
+            plan.SelectedOptionIds);
+        _decisionRecords.Add(record);
+        _lastActionDay = currentDay;
+        if (_activityWeek != currentWeek)
+        {
+            _activityWeek = currentWeek;
+            _publicActivitiesThisWeek = 0;
+        }
+
+        _publicActivitiesThisWeek++;
+        News.Publish(CampaignNewsFactory.CreateForActivity(currentDay, plan.CreateActionDefinition(), actionResolution));
+        return new CampaignDecisionResolution(actionResolution, record, appliedChanges, createdPromises);
     }
 
     public CampaignDayAdvanceResult AdvanceDay()
@@ -267,6 +418,7 @@ public sealed class CampaignSimulationSession
             {
                 Id = member.Id,
                 RoleId = member.RoleId,
+                ProfileId = member.ProfileId,
                 Assignment = assignment == null ? null : new DelegatedTaskSaveData
                 {
                     Day = assignment.Day,

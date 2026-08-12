@@ -27,7 +27,7 @@ public sealed class CampaignActionResolverTests
     }
 
     [Test]
-    public void Resolve_WhenUnaffordableRecordsUnpaidCauseWithoutImpact()
+    public void Resolve_WhenUnaffordableDoesNotPublishOrConsumeTheAction()
     {
         var state = new CampaignState(new CampaignSeed(1UL));
         var economy = new CampaignEconomy(10m);
@@ -43,7 +43,8 @@ public sealed class CampaignActionResolverTests
         Assert.That(result.WasPaid, Is.False);
         Assert.That(economy.Funds, Is.EqualTo(10m));
         Assert.That(elector.GetCandidate("player").Trust, Is.EqualTo(50m));
-        Assert.That(state.CauseRecords[0].EffectId, Is.EqualTo("unpaid-expense"));
+        Assert.That(result.Causes, Is.Empty);
+        Assert.That(state.CauseRecords, Is.Empty);
     }
 }
 }

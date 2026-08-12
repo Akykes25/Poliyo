@@ -36,6 +36,7 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
     public CampaignContentDefinition ContentCatalog => _contentCatalog;
     public string SelectedJurisdictionId => _selectedJurisdictionId;
     public bool HasAutosave => _saveRepository != null && _saveRepository.Exists(AutosaveSlotId);
+    public bool IsInitialTeamSelectionComplete => Session.TeamSelectionCompleted;
 
     public void Configure(CampaignContentDefinition contentCatalog, ulong seed, float initialFunds)
     {
@@ -98,6 +99,93 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
         return resolution;
     }
 
+    public CampaignDecisionResolution ResolveDecision(
+        CampaignActivity activity,
+        string scenarioId,
+        IReadOnlyList<string> selectedOptionIds,
+        string localityId = null)
+    {
+        if (selectedOptionIds == null) throw new ArgumentNullException(nameof(selectedOptionIds));
+        CampaignDecisionScenarioDefinition scenario = GetDecisionScenario(activity, scenarioId);
+        if (scenario == null)
+        {
+            throw new InvalidOperationException("The requested decision scenario does not exist in the campaign catalog.");
+        }
+
+        if (scenario.Steps == null || scenario.Steps.Length == 0)
+        {
+            throw new InvalidOperationException("The requested decision scenario has no authored steps.");
+        }
+
+        if (selectedOptionIds.Count != scenario.Steps.Length)
+        {
+            throw new ArgumentException("A decision must select exactly one option for every step.", nameof(selectedOptionIds));
+        }
+
+        if (string.Equals(scenario.TargetMode, "Locality", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(localityId) || !IsKnownLocality(localityId))
+            {
+                throw new InvalidOperationException("A locality is required for this political act.");
+            }
+        }
+
+        var impacts = new List<ElectoralImpact>();
+        var relationshipChanges = new List<PoliticalRelationshipChange>();
+        var promises = new List<CampaignPromiseDefinition>();
+        decimal cost = ToSimulationDecimal(scenario.BaseCost);
+        for (var stepIndex = 0; stepIndex < scenario.Steps.Length; stepIndex++)
+        {
+            CampaignDecisionOptionDefinition option = FindOption(scenario.Steps[stepIndex], selectedOptionIds[stepIndex]);
+            if (option == null)
+            {
+                throw new ArgumentException("A selected decision option does not belong to the scenario.", nameof(selectedOptionIds));
+            }
+
+            cost += ToSimulationDecimal(option.CostModifier);
+            impacts.Add(CreateImpact(scenario, option, stepIndex));
+            decimal trustDelta = ToSimulationDecimal(option.TrustDelta);
+            decimal affinityDelta = ToSimulationDecimal(option.AffinityDelta);
+            decimal obligationDelta = ToSimulationDecimal(option.ObligationDelta);
+            decimal grievanceDelta = ToSimulationDecimal(option.GrievanceDelta);
+            if (trustDelta != 0m || affinityDelta != 0m || obligationDelta != 0m || grievanceDelta != 0m)
+            {
+                relationshipChanges.Add(new PoliticalRelationshipChange(
+                    scenario.ActorId,
+                    trustDelta,
+                    affinityDelta,
+                    obligationDelta,
+                    grievanceDelta));
+            }
+
+            if (!string.IsNullOrWhiteSpace(option.PromiseId))
+            {
+                promises.Add(new CampaignPromiseDefinition(
+                    option.PromiseId + "-" + stepIndex + "-day-" + Session.Runtime.State.Calendar.CurrentDay,
+                    scenario.ActorId,
+                    string.IsNullOrWhiteSpace(option.PromiseDescription) ? option.Label : option.PromiseDescription));
+            }
+        }
+
+        var plan = new CampaignDecisionPlan(
+            scenario.Id,
+            activity,
+            scenario.ActorId,
+            Math.Max(0m, cost),
+            impacts,
+            selectedOptionIds,
+            relationshipChanges,
+            promises);
+        CampaignDecisionResolution resolution = Session.ResolveDecision(plan, SelectDecisionTargets(scenario, localityId));
+        if (resolution.WasResolved)
+        {
+            SaveAutosave();
+        }
+
+        NotifyStateChanged();
+        return resolution;
+    }
+
     public CampaignDayAdvanceResult AdvanceDay()
     {
         CampaignDayAdvanceResult result = Session.AdvanceDay();
@@ -111,6 +199,47 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
         Session.AssignTeamTask(memberId, taskType, targetId);
         SaveAutosave();
         NotifyStateChanged();
+    }
+
+    public void SelectTeamMember(string roleId, string profileId)
+    {
+        Session.SelectTeamMember(roleId, profileId);
+        SaveAutosave();
+        NotifyStateChanged();
+    }
+
+    public void FinalizeTeamSelection()
+    {
+        Session.FinalizeTeamSelection();
+        SaveAutosave();
+        NotifyStateChanged();
+    }
+
+    public CampaignTeamCandidateDefinition[] GetTeamCandidates(string roleId)
+    {
+        return _contentCatalog == null ? Array.Empty<CampaignTeamCandidateDefinition>() : _contentCatalog.GetCandidatesForRole(roleId);
+    }
+
+    public CampaignDecisionScenarioDefinition[] GetDecisionScenarios(CampaignActivity activity)
+    {
+        var scenarios = new List<CampaignDecisionScenarioDefinition>();
+        if (_contentCatalog == null) return scenarios.ToArray();
+        string activityId = activity.ToString();
+        foreach (CampaignDecisionScenarioDefinition scenario in _contentCatalog.DecisionScenarios)
+        {
+            if (scenario != null && string.Equals(scenario.ActivityId, activityId, StringComparison.OrdinalIgnoreCase))
+            {
+                scenarios.Add(scenario);
+            }
+        }
+
+        return scenarios.ToArray();
+    }
+
+    public CampaignDecisionScenarioDefinition GetDecisionScenario(CampaignActivity activity, string scenarioId = null)
+    {
+        if (_contentCatalog == null) return null;
+        return _contentCatalog.GetDecisionScenario((CampaignActivityId)activity, scenarioId);
     }
 
     public void SelectJurisdiction(string jurisdictionId)
@@ -177,12 +306,14 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
             electorate,
             CreateTeam(),
             new NewsMemory(),
-            electionRulesVersion);
+            electionRulesVersion,
+            savedCampaign == null ? false : savedCampaign.TeamSelectionCompleted);
         if (savedCampaign != null)
         {
             session.RestoreActivityLimits(savedCampaign);
             session.RestoreTeam(savedCampaign);
             session.RestoreNews(savedCampaign);
+            session.RestorePoliticalMemory(savedCampaign);
             session.RestoreElectionResult(savedCampaign);
         }
         else
@@ -246,6 +377,30 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
         return targets.Count > 0 ? targets : Session.Electorate;
     }
 
+    private IReadOnlyList<MicroElector> SelectDecisionTargets(CampaignDecisionScenarioDefinition scenario, string localityId)
+    {
+        if (!string.Equals(scenario.TargetMode, "Locality", StringComparison.OrdinalIgnoreCase))
+        {
+            return Session.Electorate;
+        }
+
+        var targets = new List<MicroElector>();
+        foreach (MicroElector elector in Session.Electorate)
+        {
+            if (elector.LocalityId == localityId)
+            {
+                targets.Add(elector);
+            }
+        }
+
+        if (targets.Count == 0)
+        {
+            throw new InvalidOperationException("The selected locality has no electorate data.");
+        }
+
+        return targets;
+    }
+
     private void SaveAutosave()
     {
         CampaignSaveData saveData = Session.CreateSaveData();
@@ -266,6 +421,17 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
             {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    public bool IsKnownLocality(string localityId)
+    {
+        if (string.IsNullOrWhiteSpace(localityId) || _contentCatalog == null) return false;
+        foreach (LocalityDefinition locality in _contentCatalog.Localities)
+        {
+            if (locality != null && locality.Id == localityId) return true;
         }
 
         return false;
@@ -293,17 +459,43 @@ public sealed class CampaignGameSessionHost : MonoBehaviour
 
     private static CampaignTeam CreateTeam()
     {
-        return new CampaignTeam(new[]
+        return new CampaignTeam(new CampaignTeamMember[0]);
+    }
+
+    private static CampaignDecisionOptionDefinition FindOption(CampaignDecisionStepDefinition step, string optionId)
+    {
+        if (step == null || step.Options == null) return null;
+        foreach (CampaignDecisionOptionDefinition option in step.Options)
         {
-            new CampaignTeamMember("vicepresidencia", "vicepresidencia"),
-            new CampaignTeamMember("jefatura-campana", "jefatura-campana"),
-            new CampaignTeamMember("jefatura-prensa", "jefatura-prensa"),
-            new CampaignTeamMember("voceria", "voceria"),
-            new CampaignTeamMember("coordinacion-territorial", "coordinacion-territorial"),
-            new CampaignTeamMember("legal-contable", "legal-contable"),
-            new CampaignTeamMember("consultoria-politica", "consultoria-politica"),
-            new CampaignTeamMember("jefatura-operaciones", "jefatura-operaciones"),
-        });
+            if (option != null && option.Id == optionId) return option;
+        }
+
+        return null;
+    }
+
+    private static ElectoralImpact CreateImpact(CampaignDecisionScenarioDefinition scenario, CampaignDecisionOptionDefinition option, int stepIndex)
+    {
+        if (!Enum.TryParse(option.MetricId, true, out ElectoralMetric metric) || !Enum.IsDefined(typeof(ElectoralMetric), metric))
+        {
+            throw new InvalidOperationException("A decision option references an invalid electoral metric.");
+        }
+
+        return new ElectoralImpact(
+            scenario.Id + "-step-" + stepIndex,
+            CampaignCandidateIds.Player,
+            metric,
+            ToSimulationDecimal(option.ImpactDelta),
+            ToSimulationDecimal(option.Reach),
+            ToSimulationDecimal(option.Relevance),
+            ToSimulationDecimal(option.Compatibility),
+            ToSimulationDecimal(option.Credibility),
+            ToSimulationDecimal(option.MediaFraming),
+            ToSimulationDecimal(option.Novelty));
+    }
+
+    private static decimal ToSimulationDecimal(float value)
+    {
+        return decimal.Round((decimal)value, 4, MidpointRounding.AwayFromZero);
     }
 
     private static IReadOnlyList<MonthlyCommitment> CreateCommitments()

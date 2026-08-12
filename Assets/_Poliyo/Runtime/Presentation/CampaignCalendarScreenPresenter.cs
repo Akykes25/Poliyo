@@ -3,6 +3,7 @@ using Poliyo.Application;
 using Poliyo.Simulation;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Poliyo.Presentation
@@ -63,17 +64,28 @@ public sealed class CampaignCalendarScreenPresenter : MonoBehaviour
 
     public void ResolveRally()
     {
-        ResolveAction(CampaignActivity.Rally, "Acto");
+        OpenDecisionScene("PoliticalRally");
     }
 
     public void ResolveInterview()
     {
-        ResolveAction(CampaignActivity.Interview, "Entrevista");
+        OpenDecisionScene("Interview");
     }
 
     public void ResolveNegotiation()
     {
-        ResolveAction(CampaignActivity.Negotiation, "Negociación");
+        OpenDecisionScene("PoliticalNegotiation");
+    }
+
+    private void OpenDecisionScene(string sceneName)
+    {
+        if (_host != null && !_host.Session.TeamSelectionCompleted)
+        {
+            _statusLabel.text = "Confirmá la elección inicial del equipo antes de abrir una escena política.";
+            return;
+        }
+
+        SceneManager.LoadScene(sceneName);
     }
 
     public void AdvanceDay()

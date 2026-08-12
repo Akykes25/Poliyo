@@ -5,18 +5,25 @@ namespace Poliyo.Simulation
 public sealed class CampaignTeamMember
 {
     public CampaignTeamMember(string id, string roleId)
+        : this(id, roleId, id)
     {
-        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(roleId))
+    }
+
+    public CampaignTeamMember(string id, string roleId, string profileId)
+    {
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(roleId) || string.IsNullOrWhiteSpace(profileId))
         {
-            throw new ArgumentException("A team member requires an id and role.");
+            throw new ArgumentException("A team member requires an id, role and selected profile.");
         }
 
         Id = id;
         RoleId = roleId;
+        ProfileId = profileId;
     }
 
     public string Id { get; }
     public string RoleId { get; }
+    public string ProfileId { get; }
     public DelegatedTaskAssignment CurrentAssignment { get; private set; }
 
     public bool IsAvailable => CurrentAssignment == null;

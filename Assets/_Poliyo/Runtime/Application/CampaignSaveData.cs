@@ -6,7 +6,7 @@ namespace Poliyo.Application
 [Serializable]
 public sealed class CampaignSaveData
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
     public const int LegacyElectionRulesVersion = 0;
     public const int CurrentElectionRulesVersion = 1;
 
@@ -21,9 +21,14 @@ public sealed class CampaignSaveData
     public int PublicActivitiesThisWeek;
     public int ElectionRulesVersion = CurrentElectionRulesVersion;
     public string SelectedJurisdictionId;
+    public bool TeamSelectionCompleted = true;
     public ElectorSaveData[] Electorate = Array.Empty<ElectorSaveData>();
     public TeamMemberSaveData[] TeamMembers = Array.Empty<TeamMemberSaveData>();
     public NewsItemSaveData[] NewsItems = Array.Empty<NewsItemSaveData>();
+    public PoliticalRelationshipSaveData[] Relationships = Array.Empty<PoliticalRelationshipSaveData>();
+    public PoliticalPromiseSaveData[] Promises = Array.Empty<PoliticalPromiseSaveData>();
+    public CampaignDecisionRecordSaveData[] DecisionRecords = Array.Empty<CampaignDecisionRecordSaveData>();
+    public CauseRecordSaveData[] CauseRecords = Array.Empty<CauseRecordSaveData>();
     public ElectionResultSaveData ElectionResult;
 }
 
@@ -53,7 +58,50 @@ public sealed class TeamMemberSaveData
 {
     public string Id;
     public string RoleId;
+    public string ProfileId;
     public DelegatedTaskSaveData Assignment;
+}
+
+[Serializable]
+public sealed class PoliticalRelationshipSaveData
+{
+    public string ActorId;
+    public decimal Trust;
+    public decimal Affinity;
+    public decimal Obligation;
+    public decimal Grievance;
+}
+
+[Serializable]
+public sealed class PoliticalPromiseSaveData
+{
+    public string Id;
+    public string CounterpartId;
+    public string Description;
+    public int CreatedDay;
+}
+
+[Serializable]
+public sealed class CampaignDecisionRecordSaveData
+{
+    public string Id;
+    public string DecisionId;
+    public int Day;
+    public string Activity;
+    public string ActorId;
+    public decimal Cost;
+    public string[] SelectedOptionIds = Array.Empty<string>();
+}
+
+[Serializable]
+public sealed class CauseRecordSaveData
+{
+    public int Day;
+    public string Category;
+    public string SourceId;
+    public string TargetId;
+    public string EffectId;
+    public decimal Magnitude;
 }
 
 [Serializable]

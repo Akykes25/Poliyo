@@ -11,6 +11,8 @@ public enum CauseCategory
     Event,
     RivalAction,
     Election,
+    PoliticalRelationship,
+    PoliticalPromise,
 }
 
 /// <summary>

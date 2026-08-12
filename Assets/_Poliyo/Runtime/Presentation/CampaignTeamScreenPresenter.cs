@@ -110,7 +110,13 @@ public sealed class CampaignTeamScreenPresenter : MonoBehaviour
 
         for (var index = 0; index < _memberIds.Length; index++)
         {
-            CampaignTeamMember listedMember = _host.Session.Team.Members[_memberIds[index]];
+            if (!_host.Session.Team.Members.TryGetValue(_memberIds[index], out CampaignTeamMember listedMember))
+            {
+                _availabilityLabels[index].text = "SELECCIÓN INICIAL PENDIENTE";
+                _memberButtons[index].interactable = false;
+                continue;
+            }
+
             _availabilityLabels[index].text = listedMember.IsAvailable
                 ? "DISPONIBLE"
                 : "EN TAREA · " + GetTaskName(listedMember.CurrentAssignment.TaskType).ToUpperInvariant();
@@ -122,7 +128,9 @@ public sealed class CampaignTeamScreenPresenter : MonoBehaviour
         {
             SetActionsInteractable(false);
             _roleLabel.text = "Seleccioná un integrante";
-            _assignmentLabel.text = "Elegí un rol para revisar su disponibilidad y delegar una tarea.";
+            _assignmentLabel.text = _host.Session.TeamSelectionCompleted
+                ? "Elegí un rol para revisar su disponibilidad y delegar una tarea."
+                : "La selección inicial todavía no está confirmada. Volvé a la escena de elección del equipo.";
             return;
         }
 

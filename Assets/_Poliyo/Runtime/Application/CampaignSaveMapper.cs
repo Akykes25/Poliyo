@@ -195,7 +195,8 @@ public static class CampaignSaveMapper
             throw new InvalidOperationException("The save has no campaign phase.");
         }
 
-        if (saveData.Electorate == null || saveData.TeamMembers == null || saveData.NewsItems == null)
+        if (saveData.Electorate == null || saveData.TeamMembers == null || saveData.NewsItems == null ||
+            saveData.Relationships == null || saveData.Promises == null || saveData.DecisionRecords == null || saveData.CauseRecords == null)
         {
             throw new InvalidOperationException("The save contains a missing collection.");
         }
@@ -245,6 +246,169 @@ public static class CampaignSaveMapper
             saveData.ElectionRulesVersion = CampaignSaveData.LegacyElectionRulesVersion;
             saveData.ElectionResult = null;
         }
+
+        if (saveData.SchemaVersion == 5)
+        {
+            saveData.SchemaVersion = 6;
+            saveData.TeamSelectionCompleted = true;
+            saveData.Relationships = Array.Empty<PoliticalRelationshipSaveData>();
+            saveData.Promises = Array.Empty<PoliticalPromiseSaveData>();
+            saveData.DecisionRecords = Array.Empty<CampaignDecisionRecordSaveData>();
+            saveData.CauseRecords = Array.Empty<CauseRecordSaveData>();
+            if (saveData.TeamMembers != null)
+            {
+                foreach (TeamMemberSaveData member in saveData.TeamMembers)
+                {
+                    if (member != null && string.IsNullOrWhiteSpace(member.ProfileId))
+                    {
+                        member.ProfileId = member.Id;
+                    }
+                }
+            }
+        }
+    }
+
+    public static PoliticalRelationshipSaveData[] CreateRelationshipData(IEnumerable<PoliticalRelationship> relationships)
+    {
+        if (relationships == null) return Array.Empty<PoliticalRelationshipSaveData>();
+        var data = new List<PoliticalRelationshipSaveData>();
+        foreach (PoliticalRelationship relationship in relationships)
+        {
+            if (relationship == null) throw new ArgumentException("A relationship is required.", nameof(relationships));
+            data.Add(new PoliticalRelationshipSaveData
+            {
+                ActorId = relationship.ActorId,
+                Trust = relationship.Trust,
+                Affinity = relationship.Affinity,
+                Obligation = relationship.Obligation,
+                Grievance = relationship.Grievance,
+            });
+        }
+
+        return data.ToArray();
+    }
+
+    public static PoliticalPromiseSaveData[] CreatePromiseData(IEnumerable<PoliticalPromise> promises)
+    {
+        if (promises == null) return Array.Empty<PoliticalPromiseSaveData>();
+        var data = new List<PoliticalPromiseSaveData>();
+        foreach (PoliticalPromise promise in promises)
+        {
+            if (promise == null) throw new ArgumentException("A promise is required.", nameof(promises));
+            data.Add(new PoliticalPromiseSaveData
+            {
+                Id = promise.Id,
+                CounterpartId = promise.CounterpartId,
+                Description = promise.Description,
+                CreatedDay = promise.CreatedDay,
+            });
+        }
+
+        return data.ToArray();
+    }
+
+    public static CampaignDecisionRecordSaveData[] CreateDecisionRecordData(IEnumerable<CampaignDecisionRecord> records)
+    {
+        if (records == null) return Array.Empty<CampaignDecisionRecordSaveData>();
+        var data = new List<CampaignDecisionRecordSaveData>();
+        foreach (CampaignDecisionRecord record in records)
+        {
+            if (record == null) throw new ArgumentException("A decision record is required.", nameof(records));
+            var options = new List<string>(record.SelectedOptionIds);
+            data.Add(new CampaignDecisionRecordSaveData
+            {
+                Id = record.Id,
+                DecisionId = record.DecisionId,
+                Day = record.Day,
+                Activity = record.Activity.ToString(),
+                ActorId = record.ActorId,
+                Cost = record.Cost,
+                SelectedOptionIds = options.ToArray(),
+            });
+        }
+
+        return data.ToArray();
+    }
+
+    public static CauseRecordSaveData[] CreateCauseData(IEnumerable<CauseRecord> causes)
+    {
+        if (causes == null) return Array.Empty<CauseRecordSaveData>();
+        var data = new List<CauseRecordSaveData>();
+        foreach (CauseRecord cause in causes)
+        {
+            if (cause == null) throw new ArgumentException("A cause is required.", nameof(causes));
+            data.Add(new CauseRecordSaveData
+            {
+                Day = cause.Day,
+                Category = cause.Category.ToString(),
+                SourceId = cause.SourceId,
+                TargetId = cause.TargetId,
+                EffectId = cause.EffectId,
+                Magnitude = cause.Magnitude,
+            });
+        }
+
+        return data.ToArray();
+    }
+
+    public static IReadOnlyList<PoliticalRelationship> RestoreRelationships(CampaignSaveData saveData)
+    {
+        Validate(saveData);
+        var relationships = new List<PoliticalRelationship>();
+        foreach (PoliticalRelationshipSaveData data in saveData.Relationships)
+        {
+            if (data == null) throw new InvalidOperationException("The save contains an invalid relationship.");
+            relationships.Add(new PoliticalRelationship(data.ActorId, data.Trust, data.Affinity, data.Obligation, data.Grievance));
+        }
+
+        return relationships;
+    }
+
+    public static IReadOnlyList<PoliticalPromise> RestorePromises(CampaignSaveData saveData)
+    {
+        Validate(saveData);
+        var promises = new List<PoliticalPromise>();
+        foreach (PoliticalPromiseSaveData data in saveData.Promises)
+        {
+            if (data == null) throw new InvalidOperationException("The save contains an invalid promise.");
+            promises.Add(new PoliticalPromise(data.Id, data.CounterpartId, data.Description, data.CreatedDay));
+        }
+
+        return promises;
+    }
+
+    public static IReadOnlyList<CampaignDecisionRecord> RestoreDecisionRecords(CampaignSaveData saveData)
+    {
+        Validate(saveData);
+        var records = new List<CampaignDecisionRecord>();
+        foreach (CampaignDecisionRecordSaveData data in saveData.DecisionRecords)
+        {
+            if (data == null || !Enum.TryParse(data.Activity, out CampaignActivity activity) || !Enum.IsDefined(typeof(CampaignActivity), activity))
+            {
+                throw new InvalidOperationException("The save contains an invalid decision record.");
+            }
+
+            records.Add(new CampaignDecisionRecord(data.Id, data.DecisionId, data.Day, activity, data.ActorId, data.Cost, data.SelectedOptionIds));
+        }
+
+        return records;
+    }
+
+    public static IReadOnlyList<CauseRecord> RestoreCauses(CampaignSaveData saveData)
+    {
+        Validate(saveData);
+        var causes = new List<CauseRecord>();
+        foreach (CauseRecordSaveData data in saveData.CauseRecords)
+        {
+            if (data == null || !Enum.TryParse(data.Category, out CauseCategory category) || !Enum.IsDefined(typeof(CauseCategory), category))
+            {
+                throw new InvalidOperationException("The save contains an invalid cause record.");
+            }
+
+            causes.Add(new CauseRecord(data.Day, category, data.SourceId, data.TargetId, data.EffectId, data.Magnitude));
+        }
+
+        return causes;
     }
 
     private static void ValidateElectionResultData(ElectionResultSaveData electionResult)

@@ -14,6 +14,13 @@ public sealed class UiSceneNavigation : MonoBehaviour
             throw new ArgumentException("A destination scene name is required.", nameof(sceneName));
         }
 
+        if (sceneName == "CampaignSlice" && CampaignGameSessionHost.Current != null &&
+            !CampaignGameSessionHost.Current.IsInitialTeamSelectionComplete)
+        {
+            SceneManager.LoadScene("TeamSelection");
+            return;
+        }
+
         SceneManager.LoadScene(sceneName);
     }
 

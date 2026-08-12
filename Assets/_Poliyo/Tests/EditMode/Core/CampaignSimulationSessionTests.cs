@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Poliyo.Application;
 using Poliyo.Core;
@@ -31,6 +32,119 @@ public sealed class CampaignSimulationSessionTests
         session.ResolveAction(action, electorate);
 
         Assert.That(() => session.ResolveAction(action, electorate), Throws.TypeOf<System.InvalidOperationException>());
+    }
+
+    [Test]
+    public void ResolveDecision_AfterTeamSelectionPersistsRelationshipPromiseAndRecord()
+    {
+        CampaignSimulationSession session = CreateDecisionSession(250m);
+        SelectCompleteTeam(session);
+
+        var plan = new CampaignDecisionPlan(
+            "negotiation-rival-day-1",
+            CampaignActivity.Negotiation,
+            "rival-contr",
+            40m,
+            new[]
+            {
+                new ElectoralImpact("negotiation-rival-day-1", CampaignCandidateIds.Player, ElectoralMetric.Trust, 2m, 1m, 1m, 1m, 1m, 1m, 1m),
+            },
+            new[] { "offer-information" },
+            new[] { new PoliticalRelationshipChange("rival-contr", 5m, 3m, 2m, -1m) },
+            new[] { new CampaignPromiseDefinition("promise-territory", "rival-contr", "Compartir una señal territorial verificable.") });
+
+        CampaignDecisionResolution result = session.ResolveDecision(plan, session.Electorate);
+
+        Assert.That(result.WasResolved, Is.True);
+        Assert.That(session.Runtime.Economy.Funds, Is.EqualTo(210m));
+        Assert.That(session.Relationships["rival-contr"].Trust, Is.EqualTo(5m));
+        Assert.That(session.Promises, Has.Count.EqualTo(1));
+        Assert.That(session.DecisionRecords, Has.Count.EqualTo(1));
+        Assert.That(session.Runtime.State.CauseRecords.Any(cause => cause.Category == CauseCategory.PoliticalPromise), Is.True);
+    }
+
+    [Test]
+    public void ResolveDecision_WhenUnaffordableIsAtomicAndDoesNotCreatePoliticalMemory()
+    {
+        CampaignSimulationSession session = CreateDecisionSession(10m);
+        SelectCompleteTeam(session);
+        var plan = new CampaignDecisionPlan(
+            "negotiation-rival-day-1",
+            CampaignActivity.Negotiation,
+            "rival-contr",
+            40m,
+            new[]
+            {
+                new ElectoralImpact("negotiation-rival-day-1", CampaignCandidateIds.Player, ElectoralMetric.Trust, 2m, 1m, 1m, 1m, 1m, 1m, 1m),
+            },
+            new[] { "offer-information" },
+            new[] { new PoliticalRelationshipChange("rival-contr", 5m, 3m, 2m, -1m) },
+            new[] { new CampaignPromiseDefinition("promise-territory", "rival-contr", "Compartir una señal territorial verificable.") });
+
+        CampaignDecisionResolution result = session.ResolveDecision(plan, session.Electorate);
+
+        Assert.That(result.WasResolved, Is.False);
+        Assert.That(session.Runtime.Economy.Funds, Is.EqualTo(10m));
+        Assert.That(session.Relationships, Is.Empty);
+        Assert.That(session.Promises, Is.Empty);
+        Assert.That(session.DecisionRecords, Is.Empty);
+        Assert.That(session.News.Items, Is.Empty);
+        Assert.That(session.CanResolvePublicAction, Is.True);
+    }
+
+    [Test]
+    public void SaveRoundTrip_RestoresTeamSelectionAndDecisionMemory()
+    {
+        CampaignSimulationSession source = CreateDecisionSession(250m);
+        SelectCompleteTeam(source);
+        var plan = new CampaignDecisionPlan(
+            "negotiation-rival-day-1",
+            CampaignActivity.Negotiation,
+            "rival-contr",
+            40m,
+            new[]
+            {
+                new ElectoralImpact("negotiation-rival-day-1", CampaignCandidateIds.Player, ElectoralMetric.Trust, 2m, 1m, 1m, 1m, 1m, 1m, 1m),
+            },
+            new[] { "offer-information" },
+            new[] { new PoliticalRelationshipChange("rival-contr", 5m, 3m, 2m, -1m) },
+            new[] { new CampaignPromiseDefinition("promise-territory", "rival-contr", "Compartir una señal territorial verificable.") });
+        source.ResolveDecision(plan, source.Electorate);
+
+        CampaignSaveData saveData = source.CreateSaveData();
+        CampaignRuntime restoredRuntime = CampaignRuntime.Restore(saveData, new List<MonthlyCommitment>());
+        var restored = new CampaignSimulationSession(
+            restoredRuntime,
+            CampaignSaveMapper.RestoreElectorate(saveData),
+            new CampaignTeam(new CampaignTeamMember[0]),
+            new NewsMemory(),
+            saveData.ElectionRulesVersion,
+            saveData.TeamSelectionCompleted);
+        restored.RestoreActivityLimits(saveData);
+        restored.RestoreTeam(saveData);
+        restored.RestoreNews(saveData);
+        restored.RestorePoliticalMemory(saveData);
+
+        Assert.That(saveData.SchemaVersion, Is.EqualTo(CampaignSaveData.CurrentSchemaVersion));
+        Assert.That(restored.TeamSelectionCompleted, Is.True);
+        Assert.That(restored.Team.IsSelectionComplete, Is.True);
+        Assert.That(restored.Relationships["rival-contr"].Affinity, Is.EqualTo(3m));
+        Assert.That(restored.Promises, Has.Count.EqualTo(1));
+        Assert.That(restored.DecisionRecords, Has.Count.EqualTo(1));
+        Assert.That(restored.Runtime.State.CauseRecords, Has.Count.EqualTo(source.Runtime.State.CauseRecords.Count));
+    }
+
+    [Test]
+    public void SelectTeamMember_AfterFinalizationRejectsRosterChanges()
+    {
+        CampaignSimulationSession session = CreateDecisionSession(250m);
+        SelectCompleteTeam(session);
+
+        Assert.That(
+            () => session.SelectTeamMember(CampaignTeamRoleIds.VicePresident, "replacement-profile"),
+            Throws.TypeOf<System.InvalidOperationException>());
+        Assert.That(session.Team.TryGetMemberByRole(CampaignTeamRoleIds.VicePresident, out CampaignTeamMember member), Is.True);
+        Assert.That(member.ProfileId, Is.EqualTo("profile-0"));
     }
 
     [Test]
@@ -232,6 +346,41 @@ public sealed class CampaignSimulationSessionTests
             electorate,
             team ?? new CampaignTeam(new CampaignTeamMember[0]),
             new NewsMemory());
+    }
+
+    private static CampaignSimulationSession CreateDecisionSession(decimal funds)
+    {
+        var runtime = new CampaignRuntime(new CampaignSeed(19UL), funds, new List<MonthlyCommitment>());
+        runtime.StartCampaign();
+        var electorate = new List<MicroElector>
+        {
+            new MicroElector("elector", "locality", 100m, 100m, new[]
+            {
+                new CandidateElectoralState(CampaignCandidateIds.Player, 50m, 50m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Liberales, 50m, 20m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Contr, 50m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Zurditos, 50m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Federales, 50m, 10m, 0m),
+            }),
+        };
+
+        return new CampaignSimulationSession(
+            runtime,
+            electorate,
+            new CampaignTeam(new CampaignTeamMember[0]),
+            new NewsMemory(),
+            teamSelectionCompleted: false);
+    }
+
+    private static void SelectCompleteTeam(CampaignSimulationSession session)
+    {
+        var index = 0;
+        foreach (string roleId in CampaignTeamRoleIds.All)
+        {
+            session.SelectTeamMember(roleId, "profile-" + index++);
+        }
+
+        session.FinalizeTeamSelection();
     }
 
     private static CampaignSimulationSession CreateSessionAtCampaignStart()
