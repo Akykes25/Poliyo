@@ -1,0 +1,431 @@
+<!DOCTYPE html><html lang="es"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poliyo - Mesa de campaña territorial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <style>
+        @import url('https://fonts.cdnfonts.com/css/cabinet-grotesk');
+        @import url('https://fonts.cdnfonts.com/css/satoshi');
+
+        :root {
+            --amarillo-campaña: #FFE17C;
+            --carbon-roscalia: #171E19;
+            --salvia-institucional: #B7C6C2;
+            --blanco-papel: #FFFFFF;
+            --tinta: #000000;
+            --alerta: #E85D4A;
+            --tendencia: #4B8E63;
+            --rival: #D86A9A;
+            --info: #57B8D1;
+            --incertidumbre: #8D79C7;
+        }
+
+        body {
+            font-family: 'Satoshi', sans-serif;
+            background-color: var(--salvia-institucional);
+            color: var(--tinta);
+            margin: 0;
+            overflow: hidden;
+        }
+
+        h1, h2, h3, h4, .display-font {
+            font-family: 'Cabinet Grotesk', sans-serif;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+        }
+
+        .neo-brutal-card {
+            background-color: var(--blanco-papel);
+            border: 2px solid var(--tinta);
+            box-shadow: 4px 4px 0px var(--tinta);
+        }
+
+        .neo-brutal-button {
+            background-color: var(--amarillo-campaña);
+            border: 2px solid var(--tinta);
+            box-shadow: 4px 4px 0px var(--tinta);
+            font-weight: 700;
+            transition: all 0.1s ease;
+        }
+
+        .pattern-dots {
+            background-image: radial-gradient(var(--tinta) 1px, transparent 1px);
+            background-size: 16px 16px;
+            opacity: 0.08;
+        }
+
+        .map-bg {
+            background-color: #E2E8E6;
+        }
+
+        .jurisdiction-label {
+            font-family: 'Cabinet Grotesk', sans-serif;
+            font-size: 10px;
+            font-weight: 800;
+            background: var(--tinta);
+            color: white;
+            padding: 2px 4px;
+            position: absolute;
+        }
+
+        .route-line {
+            stroke: var(--tinta);
+            stroke-width: 1;
+            stroke-dasharray: 4 4;
+            opacity: 0.2;
+        }
+
+        .locality-marker {
+            width: 6px;
+            height: 6px;
+            background: var(--tinta);
+            border-radius: 50%;
+            position: absolute;
+        }
+
+        .locality-marker.active {
+            background: var(--amarillo-campaña);
+            border: 1px solid var(--tinta);
+            transform: scale(1.5);
+            box-shadow: 2px 2px 0px var(--tinta);
+        }
+
+        .candidate-pin {
+            filter: drop-shadow(2px 2px 0px rgba(0,0,0,1));
+        }
+    </style>
+</head>
+<body>
+    <div class="flex flex-col h-screen overflow-hidden select-none">
+        
+        <!-- HEADER (88px) -->
+        <header class="h-[88px] bg-[#FFE17C] text-black flex items-center justify-between px-8 z-50 border-b-2 border-black">
+            <div class="flex items-center gap-6">
+                <div class="bg-[#171E19] text-[#FFE17C] px-4 py-1 border-2 border-black rotate-[-1deg] shadow-[4px_4px_0px_#000]">
+                    <span class="display-font text-2xl tracking-tighter">POLIYO</span>
+                </div>
+                <div class="flex flex-col border-l-2 border-black/30 pl-6">
+                    <span class="text-[10px] opacity-70 tracking-[0.2em] uppercase font-bold">DÍA 18 / 60</span>
+                    <span class="display-font text-lg leading-none">MARTES 14 DE MAYO</span>
+                </div>
+            </div>
+
+            <nav class="flex h-full items-end gap-1">
+                <a href="#" id="nav-calendario" class="px-6 py-3 hover:bg-black/10 border-2 border-transparent border-b-0 font-bold transition-all">CALENDARIO</a>
+                <a href="#" id="nav-mapa" class="px-6 py-3 bg-[#171E19] text-[#FFE17C] border-2 border-black border-b-0 font-bold translate-y-[2px] transition-all">MAPA</a>
+                <a href="#" id="nav-equipo" class="px-6 py-3 hover:bg-black/10 border-2 border-transparent border-b-0 font-bold transition-all">EQUIPO</a>
+            </nav>
+
+            <div class="flex items-center gap-8">
+                <div class="text-right">
+                    <span class="text-[10px] block opacity-70 font-bold uppercase tracking-wider">FONDOS</span>
+                    <span class="display-font text-2xl">₱ 184.200</span>
+                </div>
+                <button id="menu-btn" class="w-12 h-12 flex items-center justify-center border-2 border-black hover:bg-black hover:text-[#FFE17C] transition-colors">
+                    <iconify-icon icon="lucide:layout-grid" class="text-2xl"></iconify-icon>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 flex overflow-hidden relative">
+            <div class="absolute inset-0 pattern-dots pointer-events-none z-0"></div>
+
+            <!-- LEFT COL: Pulso Nacional (270px) -->
+            <aside class="w-[270px] border-r-2 border-black p-6 flex flex-col gap-6 z-10 bg-white">
+                <h2 class="display-font text-xl border-b-2 border-black pb-2">PULSO NACIONAL</h2>
+                
+                <div class="neo-brutal-card p-4">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Confianza</span>
+                        <iconify-icon icon="lucide:trending-up" class="text-[#4B8E63]"></iconify-icon>
+                    </div>
+                    <div class="text-4xl display-font">42%</div>
+                    <div class="text-[10px] mt-2 font-bold text-gray-400">F: MIXTA / 14:30</div>
+                </div>
+
+                <div class="neo-brutal-card p-4">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Intención</span>
+                        <iconify-icon icon="lucide:bar-chart-3" class="text-[#57B8D1]"></iconify-icon>
+                    </div>
+                    <div class="text-4xl display-font">28%</div>
+                    <div class="text-[10px] mt-2 font-bold text-gray-400">ENCUESTA DIARIA</div>
+                </div>
+
+                <div class="neo-brutal-card p-4">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Rechazo</span>
+                        <iconify-icon icon="lucide:trending-down" class="text-[#E85D4A]"></iconify-icon>
+                    </div>
+                    <div class="text-4xl display-font">19%</div>
+                    <div class="text-[10px] mt-2 font-bold text-gray-400">TENDENCIA ESTABLE</div>
+                </div>
+
+                <div class="mt-auto">
+                    <div class="neo-brutal-card p-3 bg-[#8D79C7]/10 border-[#8D79C7] shadow-[4px_4px_0px_#8D79C7] flex items-center gap-3">
+                        <iconify-icon icon="lucide:eye-off" class="text-lg text-[#8D79C7]"></iconify-icon>
+                        <div>
+                            <div class="text-[9px] font-black uppercase text-[#8D79C7]">Estado de la Niebla</div>
+                            <div class="text-xs font-bold">Activa en 12 días</div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- CENTER: Mando Territorial -->
+            <section class="flex-1 p-6 flex flex-col gap-6 z-10 overflow-hidden">
+                
+                <!-- MAPA CENTRAL ACTIONABLE -->
+                <div class="flex-1 neo-brutal-card map-bg relative overflow-hidden flex flex-col">
+                    <!-- Map Header Controls -->
+                    <div class="absolute top-4 left-4 z-20 flex gap-2">
+                        <button class="neo-brutal-button bg-white px-3 py-1 text-xs">ZOOM +</button>
+                        <button class="neo-brutal-button bg-white px-3 py-1 text-xs">CAPAS</button>
+                    </div>
+                    <div class="absolute top-4 right-4 z-20">
+                        <div class="bg-black text-white px-3 py-1 text-[10px] font-black tracking-widest uppercase shadow-[4px_4px_0px_#FFE17C]">ROS-SAT V4.1</div>
+                    </div>
+
+                    <!-- SVG Stylized Map of Roscalia -->
+                    <div class="absolute inset-0 flex items-center justify-center p-12">
+                        <svg class="w-full h-full max-w-4xl" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Stylized Silhouette -->
+                            <path d="M200 100 L600 80 L720 250 L680 500 L400 550 L150 480 L80 300 Z" fill="#B7C6C2" stroke="black" stroke-width="3" stroke-linejoin="round" />
+                            <path d="M200 100 L400 280 L400 550" stroke="black" stroke-width="2" stroke-dasharray="6 6" />
+                            <path d="M400 280 L720 250" stroke="black" stroke-width="2" stroke-dasharray="6 6" />
+                            <path d="M600 80 L400 280" stroke="black" stroke-width="2" stroke-dasharray="6 6" />
+                            
+                            <!-- Locality Dots (Representing 24 markers) -->
+                            <circle cx="180" cy="250" r="4" fill="black" />
+                            <circle cx="220" cy="380" r="4" fill="black" />
+                            <circle cx="280" cy="150" r="4" fill="black" />
+                            <circle cx="350" cy="420" r="4" fill="black" />
+                            <circle cx="450" cy="180" r="4" fill="black" />
+                            <circle cx="520" cy="320" r="4" fill="black" />
+                            <circle cx="580" cy="450" r="4" fill="black" />
+                            <circle cx="640" cy="200" r="4" fill="black" />
+                            <circle cx="120" cy="350" r="4" fill="black" />
+                            <circle cx="400" cy="100" r="4" fill="black" />
+                            
+                            <!-- Nodes to labels -->
+                        </svg>
+
+                        <!-- Jurisdiction Labels (Absolute) -->
+                        <div class="jurisdiction-label top-[15%] left-[30%]">NORTE GRANDE</div>
+                        <div class="jurisdiction-label top-[45%] left-[22%]">VALLE GRIS</div>
+                        <div class="jurisdiction-label top-[30%] left-[55%]">COSTA AZUL</div>
+                        <div class="jurisdiction-label top-[70%] left-[45%]">PAMPA CENTRAL</div>
+                        <div class="jurisdiction-label top-[55%] right-[20%]">TIERRA BRAVA</div>
+                        <div class="jurisdiction-label top-[12%] right-[25%]">PUERTO ALBA</div>
+
+                        <!-- Highlighted Nodes -->
+                        <div class="absolute top-[12%] right-[25%] -translate-x-12 translate-y-8">
+                            <div class="w-12 h-12 border-2 border-black bg-[#FFE17C] flex items-center justify-center shadow-[4px_4px_0px_#000] animate-pulse">
+                                <iconify-icon icon="lucide:anchor" class="text-2xl"></iconify-icon>
+                            </div>
+                        </div>
+
+                        <div class="absolute top-[45%] left-[22%] translate-x-12 translate-y-6">
+                            <div class="w-10 h-10 border-2 border-black bg-[#E85D4A] flex items-center justify-center shadow-[4px_4px_0px_#000]">
+                                <iconify-icon icon="lucide:flame" class="text-xl text-white"></iconify-icon>
+                            </div>
+                        </div>
+
+                        <!-- Candidate Markers -->
+                        <div class="absolute top-[35%] left-[48%] candidate-pin bg-[#FFE17C] p-1 border-2 border-black rotate-6">
+                            <div class="w-6 h-6 bg-black flex items-center justify-center">
+                                <span class="text-[8px] text-white font-black">TÚ</span>
+                            </div>
+                        </div>
+                        <div class="absolute top-[28%] left-[52%] candidate-pin bg-[#D86A9A] p-1 border-2 border-black -rotate-3">
+                            <div class="w-6 h-6 bg-black flex items-center justify-center">
+                                <span class="text-[8px] text-white font-black">V</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Map Legend & Callout -->
+                    <div class="mt-auto p-4 border-t-2 border-black bg-white flex justify-between items-end">
+                        <div class="flex gap-6">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 bg-[#FFE17C] border border-black"></div>
+                                <span class="text-[10px] font-bold">TU CONTROL</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 bg-[#D86A9A] border border-black"></div>
+                                <span class="text-[10px] font-bold">FEDERALES</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 bg-[#E85D4A] border border-black"></div>
+                                <span class="text-[10px] font-bold">ZONA DE CONFLICTO</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Selected Locality Callout -->
+                        <div class="neo-brutal-card p-3 w-64 translate-y-1">
+                            <div class="flex justify-between items-start mb-1">
+                            <h4 class="text-xs font-black">PUERTO ALBA</h4>
+                                <span class="text-[9px] bg-black text-white px-1">PRIORIDAD A</span>
+                            </div>
+                            <p class="text-[10px] leading-tight mb-2">El precio del transporte puede mover la intención en el cordón portuario.</p>
+                            <button class="w-full py-1 bg-[#171E19] text-white text-[9px] font-bold uppercase hover:bg-black transition-colors">Ver ficha territorial</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Candidates Simplified Bottom Bar -->
+                <div class="grid grid-cols-5 gap-3">
+                    <div class="neo-brutal-card p-3 border-b-4 border-[#FFE17C]">
+                        <div class="text-[9px] font-bold opacity-50">TU CAMPAÑA</div>
+                        <div class="display-font text-sm">42.0%</div>
+                    </div>
+                    <div class="neo-brutal-card p-3 border-b-4 border-[#D86A9A]">
+                        <div class="text-[9px] font-bold opacity-50">VALDÉS</div>
+                        <div class="display-font text-sm">38.2%</div>
+                    </div>
+                    <div class="neo-brutal-card p-3 border-b-4 border-blue-400">
+                        <div class="text-[9px] font-bold opacity-50">GARZA</div>
+                        <div class="display-font text-sm">12.5%</div>
+                    </div>
+                    <div class="neo-brutal-card p-3 border-b-4 border-green-500">
+                        <div class="text-[9px] font-bold opacity-50">LUNA</div>
+                        <div class="display-font text-sm">4.1%</div>
+                    </div>
+                    <div class="neo-brutal-card p-3 border-b-4 border-gray-400">
+                        <div class="text-[9px] font-bold opacity-50">OTRO</div>
+                        <div class="display-font text-sm">3.2%</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT COL: Agenda (330px) -->
+            <aside class="w-[330px] border-l-2 border-black p-6 flex flex-col gap-6 z-10 bg-white">
+                <div class="flex justify-between items-center border-b-2 border-black pb-2">
+                    <h2 class="display-font text-xl">AGENDA DE HOY</h2>
+                    <span class="text-[9px] bg-black text-white px-2 py-1 font-bold">4 TAREAS</span>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <button id="task-1" class="neo-brutal-card p-4 text-left hover:bg-[#FFE17C]/5 transition-colors group relative">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-none border-2 border-black flex items-center justify-center group-hover:bg-[#FFE17C]">
+                                <iconify-icon icon="lucide:search"></iconify-icon>
+                            </div>
+                            <div>
+                                <div class="text-[9px] font-black uppercase opacity-40 tracking-widest">Investigación</div>
+                                <div class="font-bold text-sm">Asignar investigación - Seguridad</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button id="task-2" class="neo-brutal-card p-4 text-left hover:bg-[#FFE17C]/5 transition-colors group">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-none border-2 border-black flex items-center justify-center group-hover:bg-[#FFE17C]">
+                                <iconify-icon icon="lucide:mic-2"></iconify-icon>
+                            </div>
+                            <div>
+                                <div class="text-[9px] font-black uppercase opacity-40 tracking-widest">Entrevista</div>
+                                <div class="font-bold text-sm">Confirmar entrevista - Canal 6</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button id="task-3" class="neo-brutal-card p-4 text-left hover:bg-[#FFE17C]/5 transition-colors group">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-none border-2 border-black flex items-center justify-center group-hover:bg-[#FFE17C]">
+                                <iconify-icon icon="lucide:map-pin"></iconify-icon>
+                            </div>
+                            <div>
+                                <div class="text-[9px] font-black uppercase opacity-40 tracking-widest">Territorio</div>
+                                <div class="font-bold text-sm">Revisar promesa territorial - Valle Gris</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button id="task-4" class="neo-brutal-card p-4 text-left bg-[#E85D4A]/5 border-[#E85D4A] shadow-[4px_4px_0px_#E85D4A] group">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 border-2 border-black flex items-center justify-center bg-[#E85D4A] text-white">
+                                <iconify-icon icon="lucide:alert-octagon"></iconify-icon>
+                            </div>
+                            <div>
+                                <div class="text-[9px] font-black uppercase text-[#E85D4A] tracking-widest">Urgente</div>
+                                <div class="font-bold text-sm">Video viejo vuelve a circular</div>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="mt-auto">
+                    <div class="bg-[#171E19] text-[#FFE17C] p-4 border-2 border-black shadow-[4px_4px_0px_#000]">
+                        <div class="text-[9px] opacity-70 uppercase font-black mb-1">Compromiso Semanal</div>
+                        <div class="display-font text-xl">₱ 62.000</div>
+                        <div class="mt-3 h-2 bg-white/10">
+                            <div class="h-full bg-[#FFE17C] w-[65%]"></div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- FOOTER: Noticias -->
+        <footer class="h-[200px] bg-white border-t-2 border-black flex items-stretch z-50">
+            <div class="flex-1 p-6 flex flex-col">
+                <div class="flex items-center gap-4 mb-4">
+                    <h2 class="display-font text-lg">NOTICIAS</h2>
+                    <div class="h-[2px] flex-1 bg-black/10"></div>
+                </div>
+                <div class="flex gap-8">
+                    <article class="flex-1 border-r-2 border-black/5 pr-8">
+                        <div class="text-[9px] font-black text-[#57B8D1] uppercase tracking-wider mb-1">Puerto Alba • Hoy</div>
+                        <h4 class="font-bold text-xs leading-snug">Puerto Alba discute el precio del transporte.</h4>
+                        <div class="mt-2 text-[9px] font-black px-2 py-0.5 bg-gray-100 w-fit">SOCIAL: -1.2%</div>
+                    </article>
+                    <article class="flex-1 border-r-2 border-black/5 pr-8">
+                        <div class="text-[9px] font-black text-[#D86A9A] uppercase tracking-wider mb-1">El Vocero • Hace 3h</div>
+                        <h4 class="font-bold text-xs leading-snug">La vocera de Federales acusa doble discurso.</h4>
+                        <div class="mt-2 text-[9px] font-black px-2 py-0.5 bg-gray-100 w-fit">RIVAL +0.8%</div>
+                    </article>
+                    <article class="flex-1">
+                        <div class="text-[9px] font-black text-[#E85D4A] uppercase tracking-wider mb-1">Redes • Ahora</div>
+                        <h4 class="font-bold text-xs leading-snug">Un video viejo vuelve a circular.</h4>
+                        <div class="mt-2 text-[9px] font-black px-2 py-0.5 bg-red-100 text-red-600 w-fit">ESCÁNDALO NIVEL 2</div>
+                    </article>
+                </div>
+            </div>
+
+            <div class="w-[280px] bg-[#FFE17C] border-l-2 border-black p-6 flex flex-col justify-center gap-3">
+                <p class="text-[10px] font-black uppercase leading-none">Relaciones Públicas</p>
+                <button id="press-btn" class="neo-brutal-button bg-white text-xs py-3 w-full uppercase">Hablar con la prensa</button>
+            </div>
+
+            <div class="w-[220px] bg-[#171E19] p-4 flex flex-col justify-center">
+                    <button id="next-day" class="neo-brutal-button relative w-full h-full flex flex-col items-center justify-center gap-1 group">
+                        <span class="absolute top-2 right-2 bg-[#E85D4A] text-white border-2 border-black px-2 py-1 text-[8px] font-black uppercase">3 pendientes</span>
+                    <span class="display-font text-xl group-hover:scale-105 transition-transform">SIGUIENTE DÍA</span>
+                    <span class="text-[9px] opacity-60 font-bold uppercase tracking-widest">DÍA 19</span>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Interactive map node simulation
+        document.querySelectorAll('.neo-brutal-button, .neo-brutal-card').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.style.transform = 'translate(2px, 2px)';
+                el.style.boxShadow = '2px 2px 0px #000';
+            });
+            el.addEventListener('mouseup', () => {
+                el.style.transform = 'none';
+                el.style.boxShadow = '4px 4px 0px #000';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.transform = 'none';
+                el.style.boxShadow = '4px 4px 0px #000';
+            });
+        });
+    </script>
+</body></html>

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Poliyo.Content
 {
-[CreateAssetMenu(menuName = "Poliyo/Content/Locality", fileName = "LocalityDefinition")]
+[CreateAssetMenu(menuName = "Poliyo/Data/Locality", fileName = "LocalityDefinition")]
 public sealed class LocalityDefinition : ScriptableObject
 {
     [SerializeField] private string _id;

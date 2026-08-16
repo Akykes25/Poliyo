@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Poliyo.Content
 {
-[CreateAssetMenu(menuName = "Poliyo/Content/Campaign Catalog", fileName = "CampaignContentDefinition")]
+[CreateAssetMenu(menuName = "Poliyo/Data/Campaign Catalog", fileName = "CampaignContentDefinition")]
 public sealed class CampaignContentDefinition : ScriptableObject
 {
     [SerializeField] private LocalityDefinition[] _localities = Array.Empty<LocalityDefinition>();

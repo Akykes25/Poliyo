@@ -26,7 +26,7 @@ public sealed class ProjectIntegrationHealthTests
     private const string PoliticalRallyScenePath = "Assets/_Poliyo/Scenes/PoliticalRally.unity";
     private const string InterviewScenePath = "Assets/_Poliyo/Scenes/Interview.unity";
     private const string PoliticalNegotiationScenePath = "Assets/_Poliyo/Scenes/PoliticalNegotiation.unity";
-    private const string SampleScenePath = "Assets/Scenes/SampleScene.unity";
+    private const string SampleScenePath = "Assets/_Poliyo/Scenes/Tests/SampleScene.unity";
 
     private static readonly string[] CanonicalScenePaths =
     {
@@ -341,7 +341,7 @@ public sealed class ProjectIntegrationHealthTests
             Assert.That(initialSelection.transform.IsChildOf(drawer.transform), Is.True);
             Assert.That(
                 AssetDatabase.GetAssetPath(drawerScript),
-                Is.EqualTo("Assets/_Poliyo/Runtime/Presentation/CalendarInterviewDrawer.cs"));
+                Is.EqualTo("Assets/_Poliyo/Code/UI/CalendarInterviewDrawer.cs"));
         });
     }
 

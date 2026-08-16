@@ -15,8 +15,9 @@ namespace Poliyo.Presentation.Editor
 /// <summary>Creates the reproducible Canvas-based authoring baseline for the vertical slice.</summary>
 public static class VerticalSliceContentAndSceneBuilder
 {
-    private const string ContentRoot = "Assets/_Poliyo/Content/Localities";
-    private const string CatalogPath = "Assets/_Poliyo/Content/CampaignCatalog.asset";
+    private const string DataRoot = "Assets/_Poliyo/Data";
+    private const string LocalitiesRoot = DataRoot + "/Localities";
+    private const string CatalogPath = DataRoot + "/CampaignCatalog.asset";
     private const string ScenePath = "Assets/_Poliyo/Scenes/CampaignSlice.unity";
 
     [MenuItem("Poliyo/Vertical Slice/Create or Update Content and Scene")]
@@ -27,8 +28,8 @@ public static class VerticalSliceContentAndSceneBuilder
             return;
         }
 
-        EnsureFolder("Assets/_Poliyo/Content");
-        EnsureFolder(ContentRoot);
+        EnsureFolder(DataRoot);
+        EnsureFolder(LocalitiesRoot);
         EnsureFolder("Assets/_Poliyo/Scenes");
 
         LocalityDefinition[] localities = CreateLocalities();
@@ -55,7 +56,7 @@ public static class VerticalSliceContentAndSceneBuilder
         var definitions = new List<LocalityDefinition>(seeds.Length);
         foreach (LocalitySeed seed in seeds)
         {
-            string path = ContentRoot + "/" + seed.Id + ".asset";
+            string path = LocalitiesRoot + "/" + seed.Id + ".asset";
             LocalityDefinition definition = AssetDatabase.LoadAssetAtPath<LocalityDefinition>(path);
             if (definition == null)
             {

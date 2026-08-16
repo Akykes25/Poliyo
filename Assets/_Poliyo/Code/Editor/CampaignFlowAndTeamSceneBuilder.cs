@@ -18,7 +18,7 @@ namespace Poliyo.Presentation.Editor
 /// </summary>
 public static class CampaignFlowAndTeamSceneBuilder
 {
-    private const string ContentCatalogPath = "Assets/_Poliyo/Content/CampaignCatalog.asset";
+    private const string CampaignCatalogPath = "Assets/_Poliyo/Data/CampaignCatalog.asset";
     private const string MainMenuScenePath = "Assets/_Poliyo/Scenes/MainMenu.unity";
     private const string CampaignSliceScenePath = "Assets/_Poliyo/Scenes/CampaignSlice.unity";
     private const string TeamScenePath = "Assets/_Poliyo/Scenes/TeamScene.unity";
@@ -390,7 +390,7 @@ public static class CampaignFlowAndTeamSceneBuilder
 
     private static CampaignContentDefinition LoadCatalog()
     {
-        CampaignContentDefinition catalog = AssetDatabase.LoadAssetAtPath<CampaignContentDefinition>(ContentCatalogPath);
+        CampaignContentDefinition catalog = AssetDatabase.LoadAssetAtPath<CampaignContentDefinition>(CampaignCatalogPath);
         if (catalog == null)
         {
             throw new InvalidOperationException("Campaign catalog is missing. Run the content builder before rebuilding UI scenes.");

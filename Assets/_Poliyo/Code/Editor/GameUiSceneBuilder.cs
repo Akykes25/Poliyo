@@ -24,7 +24,7 @@ public static class GameUiSceneBuilder
     private const string MapScenePath = SceneFolder + "/CampaignMap.unity";
     private const string CampaignSliceScenePath = SceneFolder + "/CampaignSlice.unity";
     private const string TeamScenePath = SceneFolder + "/TeamScene.unity";
-    private const string ContentCatalogPath = "Assets/_Poliyo/Content/CampaignCatalog.asset";
+    private const string CampaignCatalogPath = "Assets/_Poliyo/Data/CampaignCatalog.asset";
 
     [MenuItem("Poliyo/UI/Create or Update Prototype Screens")]
     public static void CreateOrUpdatePrototypeScreens()
@@ -373,7 +373,7 @@ public static class GameUiSceneBuilder
 
     private static CampaignContentDefinition LoadContentCatalog()
     {
-        CampaignContentDefinition catalog = AssetDatabase.LoadAssetAtPath<CampaignContentDefinition>(ContentCatalogPath);
+        CampaignContentDefinition catalog = AssetDatabase.LoadAssetAtPath<CampaignContentDefinition>(CampaignCatalogPath);
         if (catalog == null)
         {
             throw new InvalidOperationException("Campaign catalog is missing. Run Poliyo/Vertical Slice/Create or Update Content and Scene first.");
