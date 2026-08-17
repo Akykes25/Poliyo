@@ -54,5 +54,50 @@ public static class CampaignNewsFactory
             hasUnpaidExpenses ? 0.70m : 0.40m,
             hasUnpaidExpenses ? -0.50m : 0.05m);
     }
+
+    public static NewsItem CreateForRivalAction(int day, CampaignActivity activity, CampaignActionResolution resolution)
+    {
+        if (resolution == null) throw new ArgumentNullException(nameof(resolution));
+
+        return new NewsItem(
+            $"rival-{activity}-{day}",
+            day,
+            "rival-response",
+            "rival-" + activity,
+            CampaignCandidateIds.Player,
+            EvidenceQuality.Indication,
+            resolution.WasPaid ? 0.70m : 0.35m,
+            -0.35m);
+    }
+
+    public static NewsItem CreateForDeferredConsequence(int day, CampaignDeferredConsequence consequence)
+    {
+        if (consequence == null) throw new ArgumentNullException(nameof(consequence));
+
+        return new NewsItem(
+            $"deferred-{consequence.Id}-{day}",
+            day,
+            "deferred-consequence",
+            consequence.SourceId,
+            consequence.CandidateId,
+            EvidenceQuality.Proof,
+            0.75m,
+            consequence.Magnitude >= 0m ? 0.20m : -0.45m);
+    }
+
+    public static NewsItem CreateForSliceClosure(CampaignSliceClosureResult result)
+    {
+        if (result == null) throw new ArgumentNullException(nameof(result));
+
+        return new NewsItem(
+            $"slice-closure-{result.Day}",
+            result.Day,
+            "slice-closure",
+            "simulated-election",
+            result.Outcome.WinnerId ?? result.Outcome.RunoffFirstId,
+            EvidenceQuality.Proof,
+            1m,
+            result.Outcome.WinnerId == CampaignCandidateIds.Player ? 0.60m : -0.20m);
+    }
 }
 }

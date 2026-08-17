@@ -12,6 +12,7 @@ public enum CampaignPhase
     ElectionDay,
     Scrutiny,
     Runoff,
+    SliceClosure,
     Finished,
 }
 

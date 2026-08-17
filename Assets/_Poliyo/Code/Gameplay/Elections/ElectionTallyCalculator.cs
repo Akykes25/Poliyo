@@ -77,5 +77,39 @@ public static class ElectionTallyCalculator
 
         return tally;
     }
+
+    /// <summary>Calculates a deterministic two-candidate scrutiny for the runoff.</summary>
+    public static ElectionTally CalculateRunoffResolved(
+        IEnumerable<MicroElector> microElectors,
+        IReadOnlyList<string> finalistIds,
+        CampaignSeed campaignSeed,
+        FinalVoteResolutionParameters parameters)
+    {
+        if (microElectors == null) throw new ArgumentNullException(nameof(microElectors));
+        if (finalistIds == null || finalistIds.Count != 2)
+        {
+            throw new ArgumentException("A runoff requires exactly two finalists.", nameof(finalistIds));
+        }
+
+        if (parameters == null) throw new ArgumentNullException(nameof(parameters));
+
+        var tally = new ElectionTally();
+        foreach (MicroElector elector in microElectors)
+        {
+            if (elector == null) throw new ArgumentException("A microelector is required.", nameof(microElectors));
+
+            decimal participatingWeight = elector.ElectoralWeight * elector.Participation / 100m;
+            FinalVoteDistribution distribution = FinalVoteResolver.ResolveRunoff(elector, finalistIds, campaignSeed, parameters);
+            tally.AddParticipation(participatingWeight);
+            foreach (string finalistId in finalistIds)
+            {
+                tally.AddCandidateVotes(finalistId, participatingWeight * distribution.GetCandidateShare(finalistId) / 100m);
+            }
+
+            tally.AddBlankVotes(participatingWeight * distribution.BlankShare / 100m);
+        }
+
+        return tally;
+    }
 }
 }

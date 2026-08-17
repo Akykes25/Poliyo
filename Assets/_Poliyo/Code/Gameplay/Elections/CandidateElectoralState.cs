@@ -12,8 +12,12 @@ public sealed class CandidateElectoralState
         }
 
         CandidateId = candidateId;
-        Trust = Clamp(trust);
         VotingIntention = Clamp(votingIntention);
+        // Trust is a quality signal for an already-existing electoral preference
+        // in the vertical slice. It can never exceed that preference. Keeping the
+        // invariant in the domain object also protects restored saves and future
+        // content from reintroducing the reversed presentation seen in the UI.
+        Trust = Math.Min(Clamp(trust), VotingIntention);
         Rejection = Clamp(rejection);
     }
 
@@ -27,10 +31,10 @@ public sealed class CandidateElectoralState
         switch (metric)
         {
             case ElectoralMetric.Trust:
-                Trust = Clamp(Trust + delta);
+                Trust = Math.Min(Clamp(Trust + delta), VotingIntention);
                 break;
             case ElectoralMetric.VotingIntention:
-                VotingIntention = Clamp(VotingIntention + delta);
+                SetVotingIntention(VotingIntention + delta);
                 break;
             case ElectoralMetric.Rejection:
                 Rejection = Clamp(Rejection + delta);
@@ -43,6 +47,7 @@ public sealed class CandidateElectoralState
     internal void SetVotingIntention(decimal votingIntention)
     {
         VotingIntention = Clamp(votingIntention);
+        Trust = Math.Min(Trust, VotingIntention);
     }
     private static decimal Clamp(decimal value) => Math.Min(100m, Math.Max(0m, value));
 }

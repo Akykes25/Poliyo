@@ -24,6 +24,12 @@ public static class CampaignFlowAndTeamSceneBuilder
     private const string TeamScenePath = "Assets/_Poliyo/Scenes/TeamScene.unity";
     private const string CalendarScenePath = "Assets/_Poliyo/Scenes/CampaignCalendar.unity";
     private const string MapScenePath = "Assets/_Poliyo/Scenes/CampaignMap.unity";
+    private const string TeamSelectionScenePath = "Assets/_Poliyo/Scenes/TeamSelection.unity";
+    private const string PoliticalRallyScenePath = "Assets/_Poliyo/Scenes/PoliticalRally.unity";
+    private const string InterviewScenePath = "Assets/_Poliyo/Scenes/Interview.unity";
+    private const string PoliticalNegotiationScenePath = "Assets/_Poliyo/Scenes/PoliticalNegotiation.unity";
+    private const string PressScenePath = "Assets/_Poliyo/Scenes/Press.unity";
+    private const string ElectionResultScenePath = "Assets/_Poliyo/Scenes/ElectionResult.unity";
 
     [MenuItem("Poliyo/UI/Apply Campaign Flow and Rebuild Campaign + Team")]
     public static void Apply()
@@ -62,7 +68,7 @@ public static class CampaignFlowAndTeamSceneBuilder
         Reset(newCampaign);
         Reset(loadCampaign);
         UnityEventTools.AddPersistentListener(newCampaign.onClick, menuPresenter.StartNewCampaign);
-        UnityEventTools.AddStringPersistentListener(newCampaign.onClick, navigator.OpenScene, "CampaignSlice");
+        UnityEventTools.AddStringPersistentListener(newCampaign.onClick, navigator.OpenScene, "TeamSelection");
         UnityEventTools.AddPersistentListener(loadCampaign.onClick, menuPresenter.LoadAutosave);
         UnityEventTools.AddStringPersistentListener(loadCampaign.onClick, navigator.OpenScene, "CampaignSlice");
         Save(scene, MainMenuScenePath);
@@ -160,7 +166,7 @@ public static class CampaignFlowAndTeamSceneBuilder
         UnityEventTools.AddStringPersistentListener(calendar.onClick, navigator.OpenScene, "CampaignCalendar");
         UnityEventTools.AddStringPersistentListener(map.onClick, navigator.OpenScene, "CampaignMap");
         UnityEventTools.AddStringPersistentListener(team.onClick, navigator.OpenScene, "TeamScene");
-        UnityEventTools.AddPersistentListener(press.onClick, dashboard.TogglePressPanel);
+        UnityEventTools.AddStringPersistentListener(press.onClick, navigator.OpenScene, "Press");
         UnityEventTools.AddPersistentListener(pressClose.onClick, dashboard.TogglePressPanel);
         UnityEventTools.AddStringPersistentListener(menu.onClick, navigator.OpenScene, "MainMenu");
         UnityEventTools.AddPersistentListener(nextDay.onClick, dashboard.AdvanceDay);
@@ -349,9 +355,9 @@ public static class CampaignFlowAndTeamSceneBuilder
             PoliyoButtonStyle.Quiet,
             18f);
 
-        CreateHeadline(panel.transform, "Headline_0", "EL OBSERVADOR", "La campaña entra en fase de posicionamiento", "CALIDAD MEDIA · HOY 08:10", -236f, PoliyoUiTheme.Coral);
-        CreateHeadline(panel.transform, "Headline_1", "RADIO ROSCALIA", "Los territorios reclaman señales más claras", "CALIDAD ALTA · HOY 09:25", -380f, PoliyoUiTheme.Turquoise);
-        CreateHeadline(panel.transform, "Headline_2", "CANAL DIGITAL", "La conversación crece, pero el apoyo no es lo mismo", "CALIDAD BAJA · HOY 11:40", -524f, PoliyoUiTheme.Blue);
+        CreateHeadline(panel.transform, "Headline_0", "NT · Fidel", "La campaña entra en fase de posicionamiento", "CALIDAD MEDIA · HOY 08:10", -236f, PoliyoUiTheme.Coral);
+        CreateHeadline(panel.transform, "Headline_1", "Nación · Luján", "Los territorios reclaman señales más claras", "CALIDAD ALTA · HOY 09:25", -380f, PoliyoUiTheme.Turquoise);
+        CreateHeadline(panel.transform, "Headline_2", "5C · Silvester", "La conversación crece, pero el apoyo no es lo mismo", "CALIDAD BAJA · HOY 11:40", -524f, PoliyoUiTheme.Blue);
 
         Image note = PoliyoUiTheme.CreatePanel(panel.transform, "PressMethodNote", PoliyoUiTheme.Paper);
         PoliyoUiTheme.SetRect(note.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(42f, -688f), new Vector2(1316f, 66f));
@@ -417,10 +423,16 @@ public static class CampaignFlowAndTeamSceneBuilder
         string[] canonicalOrder =
         {
             MainMenuScenePath,
+            TeamSelectionScenePath,
             CampaignSliceScenePath,
             CalendarScenePath,
             MapScenePath,
-            TeamScenePath
+            TeamScenePath,
+            PoliticalRallyScenePath,
+            InterviewScenePath,
+            PoliticalNegotiationScenePath,
+            PressScenePath,
+            ElectionResultScenePath
         };
 
         var scenes = new EditorBuildSettingsScene[canonicalOrder.Length];

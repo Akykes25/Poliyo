@@ -162,6 +162,22 @@ public sealed class CampaignSimulationSessionTests
     }
 
     [Test]
+    public void AdvanceDay_WhenAlreadyOnElectionDayResolvesPendingElection()
+    {
+        CampaignSimulationSession session = CreateSessionOnDayBeforeElection();
+        session.Runtime.AdvanceDay();
+
+        Assert.That(session.Runtime.State.Calendar.CurrentDay, Is.EqualTo(CampaignCalendar.TotalCampaignDays));
+        Assert.That(session.ElectionResult, Is.Null);
+
+        CampaignDayAdvanceResult result = session.AdvanceDay();
+
+        Assert.That(result.ElectionResult, Is.Not.Null);
+        Assert.That(session.ElectionResult, Is.SameAs(result.ElectionResult));
+        Assert.That(session.Runtime.PhaseMachine.Current, Is.EqualTo(CampaignPhase.Finished));
+    }
+
+    [Test]
     public void AdvanceDay_RepeatedFromCampaignStart_ReachesFogAndResolvesElectionAtDaySixty()
     {
         CampaignSimulationSession session = CreateSessionAtCampaignStart();
@@ -200,6 +216,42 @@ public sealed class CampaignSimulationSessionTests
 
         Assert.That(result.ElectionResult.Outcome.RequiresRunoff, Is.True);
         Assert.That(session.Runtime.PhaseMachine.Current, Is.EqualTo(CampaignPhase.Runoff));
+    }
+
+    [Test]
+    public void AdvanceDay_WhenPlayerReachesRunoff_ResolvesSecondRoundAndFinishesCampaign()
+    {
+        CampaignSimulationSession session = CreateSessionOnDayBeforeElection(requiresRunoff: true);
+
+        CampaignDayAdvanceResult firstRound = session.AdvanceDay();
+        Assert.That(session.CanResolveRunoff, Is.True);
+        CampaignDayAdvanceResult runoff = session.AdvanceDay();
+
+        Assert.That(firstRound.ElectionResult, Is.SameAs(session.ElectionResult));
+        Assert.That(session.PlayerReachedRunoff, Is.True);
+        Assert.That(session.CanResolveRunoff, Is.False);
+        Assert.That(session.ActiveElectionCandidateIds, Has.Count.EqualTo(2));
+        Assert.That(runoff.ElectionResult, Is.SameAs(session.RunoffResult));
+        Assert.That(session.RunoffResult.Outcome.WinnerId, Is.Not.Null);
+        Assert.That(session.Runtime.PhaseMachine.Current, Is.EqualTo(CampaignPhase.Finished));
+        Assert.That(session.CreateSaveData().RunoffResult, Is.Not.Null);
+    }
+
+    [Test]
+    public void AdvanceDay_WhenPlayerMissesRunoff_EndsPlayerCampaignWithoutOpeningSecondRound()
+    {
+        CampaignSimulationSession session = CreateSessionOnDayBeforeElection(
+            requiresRunoff: true,
+            playerEliminated: true);
+
+        CampaignDayAdvanceResult firstRound = session.AdvanceDay();
+
+        Assert.That(firstRound.ElectionResult.Outcome.RequiresRunoff, Is.True);
+        Assert.That(session.PlayerReachedRunoff, Is.False);
+        Assert.That(session.IsPlayerCampaignFinished, Is.True);
+        Assert.That(
+            () => session.AdvanceDay(),
+            Throws.TypeOf<System.InvalidOperationException>());
     }
 
     [Test]
@@ -308,10 +360,35 @@ public sealed class CampaignSimulationSessionTests
         AssertElectionResultsAreEqual(expected, restored.ElectionResult);
     }
 
+    [Test]
+    public void RestoreElectionResult_WithPersistedRunoff_RestoresBothRoundsAndFinishedPhase()
+    {
+        CampaignSimulationSession source = CreateSessionOnDayBeforeElection(requiresRunoff: true);
+        source.AdvanceDay();
+        CampaignElectionResult expectedRunoff = source.AdvanceDay().ElectionResult;
+        CampaignSaveData saveData = source.CreateSaveData();
+
+        CampaignRuntime restoredRuntime = CampaignRuntime.Restore(saveData, new List<MonthlyCommitment>());
+        CampaignSimulationSession restored = new CampaignSimulationSession(
+            restoredRuntime,
+            CampaignSaveMapper.RestoreElectorate(saveData),
+            new CampaignTeam(new CampaignTeamMember[0]),
+            new NewsMemory(),
+            saveData.ElectionRulesVersion);
+
+        restored.RestoreElectionResult(saveData);
+
+        Assert.That(restored.ElectionResult, Is.Not.Null);
+        Assert.That(restored.RunoffResult, Is.Not.Null);
+        AssertElectionResultsAreEqual(expectedRunoff, restored.RunoffResult);
+        Assert.That(restored.Runtime.PhaseMachine.Current, Is.EqualTo(CampaignPhase.Finished));
+    }
+
     private static CampaignSimulationSession CreateSessionOnDayBeforeElection(
         bool requiresRunoff = false,
         CampaignTeam team = null,
-        bool includeUndecided = false)
+        bool includeUndecided = false,
+        bool playerEliminated = false)
     {
         var runtime = new CampaignRuntime(new CampaignSeed(3UL), 100m, new List<MonthlyCommitment>());
         runtime.StartCampaign();
@@ -325,19 +402,19 @@ public sealed class CampaignSimulationSessionTests
             includeUndecided
                 ? new MicroElector("elector", "locality", 100m, 100m, new[]
                 {
-                    new CandidateElectoralState(CampaignCandidateIds.Player, 50m, 30m, 0m),
-                    new CandidateElectoralState(CampaignCandidateIds.Liberales, 50m, 25m, 0m),
-                    new CandidateElectoralState(CampaignCandidateIds.Contr, 50m, 10m, 0m),
-                    new CandidateElectoralState(CampaignCandidateIds.Zurditos, 50m, 10m, 0m),
-                    new CandidateElectoralState(CampaignCandidateIds.Federales, 50m, 5m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Player, 30m, 30m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Liberales, 25m, 25m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Contr, 10m, 10m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Zurditos, 10m, 10m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Federales, 5m, 5m, 0m),
                 }, blankVoteIntention: 5m, undecidedIntention: 15m)
                 : new MicroElector("elector", "locality", 100m, 100m, new[]
                 {
-                    new CandidateElectoralState(CampaignCandidateIds.Player, 50m, requiresRunoff ? 39m : 50m, 0m),
-                    new CandidateElectoralState(CampaignCandidateIds.Liberales, 50m, requiresRunoff ? 31m : 20m, 0m),
-                    new CandidateElectoralState(CampaignCandidateIds.Contr, 50m, 10m, 0m),
-                    new CandidateElectoralState(CampaignCandidateIds.Zurditos, 50m, 10m, 0m),
-                    new CandidateElectoralState(CampaignCandidateIds.Federales, 50m, 10m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Player, requiresRunoff ? (playerEliminated ? 10m : 39m) : 50m, requiresRunoff ? (playerEliminated ? 10m : 39m) : 50m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Liberales, requiresRunoff ? (playerEliminated ? 40m : 31m) : 20m, requiresRunoff ? (playerEliminated ? 40m : 31m) : 20m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Contr, requiresRunoff && playerEliminated ? 35m : 10m, requiresRunoff && playerEliminated ? 35m : 10m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Zurditos, requiresRunoff && playerEliminated ? 10m : 10m, requiresRunoff && playerEliminated ? 10m : 10m, 0m),
+                    new CandidateElectoralState(CampaignCandidateIds.Federales, requiresRunoff && playerEliminated ? 5m : 10m, requiresRunoff && playerEliminated ? 5m : 10m, 0m),
                 }),
         };
 
@@ -357,10 +434,10 @@ public sealed class CampaignSimulationSessionTests
             new MicroElector("elector", "locality", 100m, 100m, new[]
             {
                 new CandidateElectoralState(CampaignCandidateIds.Player, 50m, 50m, 0m),
-                new CandidateElectoralState(CampaignCandidateIds.Liberales, 50m, 20m, 0m),
-                new CandidateElectoralState(CampaignCandidateIds.Contr, 50m, 10m, 0m),
-                new CandidateElectoralState(CampaignCandidateIds.Zurditos, 50m, 10m, 0m),
-                new CandidateElectoralState(CampaignCandidateIds.Federales, 50m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Liberales, 20m, 20m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Contr, 10m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Zurditos, 10m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Federales, 10m, 10m, 0m),
             }),
         };
 
@@ -392,10 +469,10 @@ public sealed class CampaignSimulationSessionTests
             new MicroElector("elector", "locality", 100m, 100m, new[]
             {
                 new CandidateElectoralState(CampaignCandidateIds.Player, 50m, 50m, 0m),
-                new CandidateElectoralState(CampaignCandidateIds.Liberales, 50m, 20m, 0m),
-                new CandidateElectoralState(CampaignCandidateIds.Contr, 50m, 10m, 0m),
-                new CandidateElectoralState(CampaignCandidateIds.Zurditos, 50m, 10m, 0m),
-                new CandidateElectoralState(CampaignCandidateIds.Federales, 50m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Liberales, 20m, 20m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Contr, 10m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Zurditos, 10m, 10m, 0m),
+                new CandidateElectoralState(CampaignCandidateIds.Federales, 10m, 10m, 0m),
             }),
         };
 

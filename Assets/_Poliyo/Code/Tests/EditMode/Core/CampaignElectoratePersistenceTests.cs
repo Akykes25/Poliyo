@@ -15,8 +15,8 @@ public sealed class CampaignElectoratePersistenceTests
         runtime.StartCampaign();
         var elector = new MicroElector("elector", "locality", 20m, 70m, new[]
         {
-            new CandidateElectoralState("player", 55m, 45m, 12m),
-            new CandidateElectoralState("rival", 42m, 35m, 20m),
+            new CandidateElectoralState("player", 55m, 60m, 12m),
+            new CandidateElectoralState("rival", 42m, 45m, 20m),
         }, blankVoteIntention: 8m, undecidedIntention: 12m);
         elector.Apply("player", ElectoralMetric.Trust, 5m);
 

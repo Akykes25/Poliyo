@@ -16,14 +16,14 @@ public sealed class ElectoralImpactTests
     [Test]
     public void Apply_RejectionImpact_DoesNotChangeTrustOrIntent()
     {
-        var candidate = new CandidateElectoralState("player", 45m, 20m, 10m);
+        var candidate = new CandidateElectoralState("player", 45m, 50m, 10m);
         var elector = new MicroElector("e1", "puerto-alba", 10m, 80m, new[] { candidate });
 
         elector.Apply("player", ElectoralMetric.Rejection, 15m);
 
         Assert.That(candidate.Rejection, Is.EqualTo(25m));
         Assert.That(candidate.Trust, Is.EqualTo(45m));
-        Assert.That(candidate.VotingIntention, Is.EqualTo(20m));
+        Assert.That(candidate.VotingIntention, Is.EqualTo(50m));
     }
 }
 

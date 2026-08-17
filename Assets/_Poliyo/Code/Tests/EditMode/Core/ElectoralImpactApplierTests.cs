@@ -12,7 +12,7 @@ public sealed class ElectoralImpactApplierTests
         var state = new CampaignState(new CampaignSeed(42UL));
         var elector = new MicroElector("elector", "locality", 10m, 60m, new[]
         {
-            new CandidateElectoralState("player", 50m, 40m, 10m),
+            new CandidateElectoralState("player", 50m, 60m, 10m),
         });
         var impact = new ElectoralImpact("rally", "player", ElectoralMetric.Trust, 4m, 1m, 0.5m, 1m, 1m, 1m, 1m);
 

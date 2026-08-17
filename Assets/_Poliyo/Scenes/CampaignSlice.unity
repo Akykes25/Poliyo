@@ -848,7 +848,7 @@ MonoBehaviour:
   _contentCatalog: {fileID: 11400000, guid: b60e81e60da2c8649a24eea4a446a2ad, type: 2}
   _seed: 20260725
   _initialFunds: 1200
-  _newCampaignStartDay: 1
+  _newCampaignStartDay: 60
 --- !u!4 &169163408
 Transform:
   m_ObjectHideFlags: 0
@@ -2359,7 +2359,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: RADIO ROSCALIA
+  m_text: "Naci\xF3n \xB7 Luj\xE1n"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -6268,7 +6268,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: EL OBSERVADOR
+  m_text: "NT \xB7 Fidel"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -7159,17 +7159,16 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 71943280}
-        m_TargetAssemblyTypeName: Poliyo.Presentation.CampaignSliceDashboardPresenter,
-          Poliyo.Presentation
-        m_MethodName: TogglePressPanel
-        m_Mode: 0
+      - m_Target: {fileID: 71943282}
+        m_TargetAssemblyTypeName: Poliyo.Presentation.UiSceneNavigation, Poliyo.Presentation
+        m_MethodName: OpenScene
+        m_Mode: 5
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: 
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument: 
+          m_StringArgument: Press
           m_BoolArgument: 0
         m_CallState: 2
 --- !u!114 &1104508517
@@ -7929,7 +7928,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: CANAL DIGITAL
+  m_text: "5C \xB7 Silvester"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

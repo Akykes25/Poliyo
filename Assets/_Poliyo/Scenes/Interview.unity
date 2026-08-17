@@ -508,7 +508,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Poliyo.Presentation::Poliyo.Presentation.CampaignDecisionScenePresenter
   _activity: 1
-+  _sceneTitle: {fileID: 730000014}
+  _sceneTitle: {fileID: 730000014}
   _contextLabel: {fileID: 730000038}
   _actorLabel: {fileID: 730000030}
   _locationLabel: {fileID: 730000034}

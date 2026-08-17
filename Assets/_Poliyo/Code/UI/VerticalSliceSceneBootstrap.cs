@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace Poliyo.Presentation
 {
 /// <summary>
-/// Runtime safety net for the four vertical-slice scenes. The editor builder authors the
+/// Runtime safety net for the vertical-slice decision, press and result scenes. The editor builder authors the
 /// same hierarchy for designers, while this component guarantees that a scene checked out
 /// from source still has an actionable UGUI surface when opened in Play Mode.
 /// </summary>
@@ -21,6 +21,8 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
         PoliticalRally,
         Interview,
         PoliticalNegotiation,
+        Press,
+        ElectionResult,
     }
 
     [SerializeField] private SliceSceneKind _sceneKind = SliceSceneKind.TeamSelection;
@@ -43,7 +45,7 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
                 BuildTeamSelection();
                 break;
             case SliceSceneKind.PoliticalRally:
-                BuildDecision(CampaignActivity.Rally);
+                BuildDecision(CampaignGameSessionHost.PendingDecisionActivity ?? CampaignActivity.Rally);
                 break;
             case SliceSceneKind.Interview:
                 BuildDecision(CampaignActivity.Interview);
@@ -51,7 +53,77 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
             case SliceSceneKind.PoliticalNegotiation:
                 BuildDecision(CampaignActivity.Negotiation);
                 break;
+            case SliceSceneKind.Press:
+                BuildPress();
+                break;
+            case SliceSceneKind.ElectionResult:
+                BuildElectionResult();
+                break;
         }
+    }
+
+    private void BuildPress()
+    {
+        CampaignPressScreenPresenter presenter = GetComponent<CampaignPressScreenPresenter>() ?? gameObject.AddComponent<CampaignPressScreenPresenter>();
+        UiSceneNavigation navigator = GetComponent<UiSceneNavigation>() ?? gameObject.AddComponent<UiSceneNavigation>();
+        if (transform.Find("VerticalSlicePressWorkspace") != null) return;
+
+        RectTransform workspace = CreatePanel("VerticalSlicePressWorkspace", transform, new Color(0.035f, 0.067f, 0.145f, 0.98f));
+        Stretch(workspace, 0.025f, 0.035f, 0.025f, 0.035f);
+        CreateText("Brand", workspace, "POLIYO", 31f, new Vector2(36f, -26f), new Vector2(180f, 42f), new Color(1f, 0.78f, 0.18f, 1f), FontStyles.Bold);
+        CreateText("SceneKicker", workspace, "PRENSA · INFORMACIÓN PARCIAL", 15f, new Vector2(224f, -28f), new Vector2(520f, 28f), new Color(0.2f, 0.9f, 0.85f, 1f), FontStyles.Bold);
+        CreateText("SceneTitle", workspace, "Sala de prensa", 32f, new Vector2(224f, -62f), new Vector2(760f, 48f), Color.white, FontStyles.Bold);
+        CreateText("SceneDeck", workspace, "Elegí un medio, leé su señal editorial y abrí una entrevista con preguntas y consecuencias.", 16f, new Vector2(224f, -112f), new Vector2(1120f, 30f), new Color(0.74f, 0.8f, 0.89f, 1f));
+
+        RectTransform mediaPanel = CreatePanel("MediaPanel", workspace, new Color(0.055f, 0.11f, 0.22f, 1f));
+        SetRect(mediaPanel, new Vector2(0f, 0f), new Vector2(0.36f, 1f), new Vector2(24f, 90f), new Vector2(-16f, -168f));
+        CreateText("MediaHeading", mediaPanel, "MEDIOS DISPONIBLES", 14f, new Vector2(22f, -22f), new Vector2(360f, 24f), new Color(0.2f, 0.9f, 0.85f, 1f), FontStyles.Bold);
+        var mediaButtons = new Button[5];
+        for (var index = 0; index < mediaButtons.Length; index++)
+        {
+            int mediaIndex = index;
+            mediaButtons[index] = CreateButton("MediaButton_" + index, mediaPanel, "Medio " + (index + 1), new Vector2(20f, -62f - index * 64f), new Vector2(480f, 52f), new Color(0.1f, 0.19f, 0.34f, 1f));
+            mediaButtons[index].onClick.AddListener(() => presenter.SelectScenarioAtIndex(mediaIndex));
+        }
+
+        RectTransform dossier = CreatePanel("MediaDossier", workspace, new Color(0.94f, 0.95f, 0.98f, 1f));
+        SetRect(dossier, new Vector2(0.38f, 0f), new Vector2(1f, 1f), new Vector2(18f, 90f), new Vector2(-22f, -168f));
+        TMP_Text selectedMedia = CreateText("SelectedMediaLabel", dossier, "Seleccioná un medio", 30f, new Vector2(28f, -28f), new Vector2(760f, 44f), new Color(0.08f, 0.12f, 0.2f, 1f), FontStyles.Bold);
+        TMP_Text selectedJournalist = CreateText("SelectedJournalistLabel", dossier, "Periodista · pendiente", 17f, new Vector2(30f, -78f), new Vector2(680f, 28f), new Color(0.25f, 0.55f, 1f, 1f), FontStyles.Bold);
+        TMP_Text selectedContext = CreateText("SelectedContextLabel", dossier, "La señal del medio aparecerá acá.", 18f, new Vector2(30f, -126f), new Vector2(900f, 210f), new Color(0.08f, 0.12f, 0.2f, 1f));
+        CreateText("InterviewContract", dossier, "CONTRATO DE LA ESCENA", 14f, new Vector2(30f, -364f), new Vector2(360f, 24f), new Color(0.95f, 0.37f, 0.36f, 1f), FontStyles.Bold);
+        CreateText("InterviewContractCopy", dossier, "La selección abre la escena de entrevista. Ahí aparecen las preguntas, las respuestas, el costo, el riesgo y la reacción.", 16f, new Vector2(30f, -398f), new Vector2(900f, 72f), new Color(0.28f, 0.34f, 0.44f, 1f));
+        TMP_Text news = CreateText("NewsLabel", dossier, "Todavía no hay cobertura registrada.", 15f, new Vector2(30f, -500f), new Vector2(900f, 64f), new Color(0.28f, 0.34f, 0.44f, 1f));
+        TMP_Text status = CreateText("StatusLabel", workspace, "Elegí un medio para continuar.", 15f, new Vector2(34f, -820f), new Vector2(940f, 30f), new Color(1f, 0.78f, 0.18f, 1f), FontStyles.Bold);
+        Button openInterview = CreateButton("OpenInterviewButton", workspace, "Abrir entrevista", new Vector2(1210f, -900f), new Vector2(280f, 54f), new Color(0.95f, 0.37f, 0.36f, 1f));
+        Button back = CreateButton("ReturnToCampaignButton", workspace, "Volver al centro", new Vector2(1510f, -900f), new Vector2(260f, 54f), new Color(0.1f, 0.19f, 0.34f, 1f));
+        openInterview.onClick.AddListener(presenter.OpenSelectedInterview);
+        back.onClick.AddListener(presenter.ReturnToCampaign);
+        presenter.Configure(selectedMedia, selectedJournalist, selectedContext, news, status, mediaButtons, openInterview, back, navigator);
+    }
+
+    private void BuildElectionResult()
+    {
+        CampaignElectionResultScreenPresenter presenter = GetComponent<CampaignElectionResultScreenPresenter>() ?? gameObject.AddComponent<CampaignElectionResultScreenPresenter>();
+        UiSceneNavigation navigator = GetComponent<UiSceneNavigation>() ?? gameObject.AddComponent<UiSceneNavigation>();
+        if (transform.Find("VerticalSliceElectionResultWorkspace") != null) return;
+
+        RectTransform workspace = CreatePanel("VerticalSliceElectionResultWorkspace", transform, new Color(0.035f, 0.067f, 0.145f, 0.98f));
+        Stretch(workspace, 0.025f, 0.035f, 0.025f, 0.035f);
+        CreateText("Brand", workspace, "POLIYO", 31f, new Vector2(36f, -26f), new Vector2(180f, 42f), new Color(1f, 0.78f, 0.18f, 1f), FontStyles.Bold);
+        TMP_Text title = CreateText("ResultTitle", workspace, "Resultado de campaña", 32f, new Vector2(224f, -28f), new Vector2(900f, 48f), Color.white, FontStyles.Bold);
+        TMP_Text phase = CreateText("PhaseLabel", workspace, "Día 60 · Escrutinio", 16f, new Vector2(1450f, -32f), new Vector2(330f, 28f), new Color(0.2f, 0.9f, 0.85f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
+        RectTransform outcomePanel = CreatePanel("OutcomePanel", workspace, new Color(0.95f, 0.37f, 0.36f, 1f));
+        SetRect(outcomePanel, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(24f, 94f), new Vector2(-24f, -220f));
+        TMP_Text outcome = CreateText("OutcomeLabel", outcomePanel, "Resultado pendiente", 27f, new Vector2(28f, -28f), new Vector2(1480f, 84f), Color.white, FontStyles.Bold);
+        TMP_Text tally = CreateText("TallyLabel", outcomePanel, "La lectura de votos aparecerá acá.", 17f, new Vector2(28f, -126f), new Vector2(920f, 218f), Color.white);
+        TMP_Text causes = CreateText("CausesLabel", workspace, "Resumen de campaña", 16f, new Vector2(34f, -650f), new Vector2(1120f, 190f), new Color(0.8f, 0.84f, 0.91f, 1f));
+        TMP_Text status = CreateText("StatusLabel", workspace, "El resultado se guarda automáticamente.", 15f, new Vector2(34f, -842f), new Vector2(1120f, 30f), new Color(1f, 0.78f, 0.18f, 1f), FontStyles.Bold);
+        Button back = CreateButton("ReturnToCampaignButton", workspace, "Volver al centro", new Vector2(1240f, -900f), new Vector2(280f, 54f), new Color(0.1f, 0.19f, 0.34f, 1f));
+        Button menu = CreateButton("ReturnToMenuButton", workspace, "Menú principal", new Vector2(1540f, -900f), new Vector2(260f, 54f), new Color(0.1f, 0.19f, 0.34f, 1f));
+        back.onClick.AddListener(presenter.ReturnToCampaign);
+        menu.onClick.AddListener(presenter.ReturnToMenu);
+        presenter.Configure(title, phase, outcome, tally, causes, status, back, menu, navigator);
     }
 
     private void BuildTeamSelection()
@@ -67,7 +139,7 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
         Stretch(workspace, 0.025f, 0.035f, 0.025f, 0.035f);
         CreateText("Brand", workspace, "POLIYO", 31f, new Vector2(36f, -26f), new Vector2(180f, 42f), new Color(1f, 0.78f, 0.18f, 1f), FontStyles.Bold);
         TMP_Text title = CreateText("SceneTitle", workspace, "Elegí tu equipo", 30f, new Vector2(224f, -28f), new Vector2(650f, 44f), Color.white, FontStyles.Bold);
-        TMP_Text progress = CreateText("ProgressLabel", workspace, "0/8 roles confirmados", 17f, new Vector2(-310f, -34f), new Vector2(270f, 30f), new Color(0.2f, 0.9f, 0.85f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
+        TMP_Text progress = CreateText("ProgressLabel", workspace, "0/8 roles confirmados", 17f, new Vector2(1440f, -34f), new Vector2(270f, 30f), new Color(0.2f, 0.9f, 0.85f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
         CreateText("SceneDeck", workspace, "Ocho roles · tres personas por puesto · señales públicas, costos humanos ocultos", 16f, new Vector2(226f, -72f), new Vector2(900f, 28f), new Color(0.74f, 0.8f, 0.89f, 1f));
 
         RectTransform rolePanel = CreatePanel("RolePanel", workspace, new Color(0.055f, 0.11f, 0.22f, 1f));
@@ -114,9 +186,9 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
         TMP_Text candidateExperience = CreateText("CandidateExperience", dossier, "Experiencia pública: pendiente", 16f, new Vector2(520f, -228f), new Vector2(480f, 44f), Color.white);
         TMP_Text candidateRelationships = CreateText("CandidateRelationships", dossier, "Relaciones públicas: pendiente", 16f, new Vector2(28f, -282f), new Vector2(480f, 60f), new Color(0.75f, 0.82f, 0.91f, 1f));
         TMP_Text candidateClue = CreateText("CandidateClue", dossier, "Pista narrativa: compará trayectoria, tono y antecedentes antes de confirmar.", 16f, new Vector2(520f, -282f), new Vector2(480f, 60f), new Color(0.2f, 0.9f, 0.85f, 1f));
-        TMP_Text roleLabel = CreateText("RoleLabel", candidatePanel, "Rol por seleccionar", 16f, new Vector2(30f, 98f), new Vector2(500f, 26f), new Color(0.08f, 0.12f, 0.2f, 1f), FontStyles.Bold);
-        TMP_Text status = CreateText("StatusLabel", candidatePanel, "Elegí un rol y compará tres señales públicas.", 15f, new Vector2(30f, 56f), new Vector2(700f, 28f), new Color(0.28f, 0.34f, 0.44f, 1f));
-        Button confirm = CreateButton("ConfirmTeamButton", candidatePanel, "Confirmar equipo y comenzar", new Vector2(-420f, 26f), new Vector2(360f, 54f), new Color(0.95f, 0.37f, 0.36f, 1f));
+        TMP_Text roleLabel = CreateText("RoleLabel", candidatePanel, "Rol por seleccionar", 16f, new Vector2(30f, -780f), new Vector2(500f, 26f), new Color(0.08f, 0.12f, 0.2f, 1f), FontStyles.Bold);
+        TMP_Text status = CreateText("StatusLabel", candidatePanel, "Elegí un rol y compará tres señales públicas.", 15f, new Vector2(30f, -820f), new Vector2(700f, 28f), new Color(0.28f, 0.34f, 0.44f, 1f));
+        Button confirm = CreateButton("ConfirmTeamButton", candidatePanel, "Confirmar equipo y comenzar", new Vector2(820f, -820f), new Vector2(360f, 54f), new Color(0.95f, 0.37f, 0.36f, 1f));
         presenter.Configure(roles, roleButtons, candidateButtons, roleLabel, progress, candidateName, candidateRole, candidateTrajectory, candidateIdeology, candidateExperience, candidateRelationships, candidateClue, status, confirm, navigator);
     }
 
@@ -131,10 +203,14 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
         CreateDecisionBackdrop(activity);
         RectTransform workspace = CreatePanel("VerticalSliceDecisionWorkspace", transform, new Color(0.035f, 0.067f, 0.145f, 0.96f));
         Stretch(workspace, 0.035f, 0.05f, 0.035f, 0.05f);
-        Color accent = activity == CampaignActivity.Rally ? new Color(0.95f, 0.37f, 0.36f, 1f) : activity == CampaignActivity.Interview ? new Color(0.25f, 0.55f, 1f, 1f) : new Color(0.66f, 0.42f, 0.95f, 1f);
+        Color accent = activity == CampaignActivity.Rally || activity == CampaignActivity.Crisis
+            ? new Color(0.95f, 0.37f, 0.36f, 1f)
+            : activity == CampaignActivity.Interview
+                ? new Color(0.25f, 0.55f, 1f, 1f)
+                : new Color(0.66f, 0.42f, 0.95f, 1f);
         TMP_Text sceneTitle = CreateText("SceneTitle", workspace, GetActivityTitle(activity), 30f, new Vector2(34f, -28f), new Vector2(700f, 42f), Color.white, FontStyles.Bold);
-        TMP_Text stage = CreateText("StageLabel", workspace, "DECISIÓN 1/3", 15f, new Vector2(-360f, -32f), new Vector2(220f, 28f), new Color(0.2f, 0.9f, 0.85f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
-        TMP_Text timer = CreateText("TimerLabel", workspace, "TIEMPO · 45 s", 15f, new Vector2(-112f, -32f), new Vector2(190f, 28f), new Color(1f, 0.78f, 0.18f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
+        TMP_Text stage = CreateText("StageLabel", workspace, "DECISIÓN 1/3", 15f, new Vector2(1300f, -32f), new Vector2(220f, 28f), new Color(0.2f, 0.9f, 0.85f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
+        TMP_Text timer = CreateText("TimerLabel", workspace, "TIEMPO · 45 s", 15f, new Vector2(1530f, -32f), new Vector2(190f, 28f), new Color(1f, 0.78f, 0.18f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
         RectTransform context = CreatePanel("ContextPanel", workspace, new Color(0.055f, 0.11f, 0.22f, 1f));
         SetRect(context, new Vector2(0f, 0f), new Vector2(0.45f, 1f), new Vector2(24f, 84f), new Vector2(-22f, -118f));
         TMP_Text actor = CreateText("ActorLabel", context, "CONTRAPARTE", 15f, new Vector2(24f, -26f), new Vector2(560f, 26f), accent, FontStyles.Bold);
@@ -154,8 +230,8 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
             responses[index].onClick.AddListener(() => presenter.SelectResponseAtIndex(optionIndex));
         }
 
-        TMP_Text reaction = CreateText("ReactionLabel", workspace, "La reacción se muestra después de confirmar.", 15f, new Vector2(34f, 50f), new Vector2(780f, 38f), new Color(0.8f, 0.84f, 0.91f, 1f));
-        TMP_Text status = CreateText("StatusLabel", workspace, "Elegí una respuesta para continuar.", 15f, new Vector2(-720f, 50f), new Vector2(640f, 38f), new Color(1f, 0.78f, 0.18f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
+        TMP_Text reaction = CreateText("ReactionLabel", workspace, "La reacción se muestra después de confirmar.", 15f, new Vector2(34f, -790f), new Vector2(780f, 38f), new Color(0.8f, 0.84f, 0.91f, 1f));
+        TMP_Text status = CreateText("StatusLabel", workspace, "Elegí una respuesta para continuar.", 15f, new Vector2(900f, -790f), new Vector2(820f, 38f), new Color(1f, 0.78f, 0.18f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
         var variants = new Button[5];
         for (var index = 0; index < variants.Length; index++)
         {
@@ -164,10 +240,10 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
             variants[index].onClick.AddListener(() => presenter.SelectVariantAtIndex(variantIndex));
         }
 
-        TMP_Text timerMode = CreateText("TimerModeLabel", workspace, "TIEMPO: normal", 14f, new Vector2(-360f, 14f), new Vector2(220f, 24f), new Color(0.2f, 0.9f, 0.85f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
-        Button timerModeButton = CreateButton("TimerModeButton", workspace, "Accesibilidad", new Vector2(-126f, 12f), new Vector2(180f, 38f), new Color(0.1f, 0.19f, 0.34f, 1f));
-        Button confirm = CreateButton("ConfirmDecisionButton", workspace, "Confirmar respuesta", new Vector2(-390f, 10f), new Vector2(250f, 52f), new Color(0.95f, 0.37f, 0.36f, 1f));
-        Button back = CreateButton("ReturnToCalendarButton", workspace, "Volver al calendario", new Vector2(-670f, 10f), new Vector2(250f, 52f), new Color(0.1f, 0.19f, 0.34f, 1f));
+        TMP_Text timerMode = CreateText("TimerModeLabel", workspace, "TIEMPO: normal", 14f, new Vector2(880f, -18f), new Vector2(210f, 24f), new Color(0.2f, 0.9f, 0.85f, 1f), FontStyles.Bold, TextAlignmentOptions.Right);
+        Button timerModeButton = CreateButton("TimerModeButton", workspace, "Accesibilidad", new Vector2(1110f, -12f), new Vector2(180f, 38f), new Color(0.1f, 0.19f, 0.34f, 1f));
+        Button confirm = CreateButton("ConfirmDecisionButton", workspace, "Confirmar respuesta", new Vector2(1300f, -10f), new Vector2(250f, 52f), new Color(0.95f, 0.37f, 0.36f, 1f));
+        Button back = CreateButton("ReturnToCalendarButton", workspace, "Volver al calendario", new Vector2(1570f, -10f), new Vector2(250f, 52f), new Color(0.1f, 0.19f, 0.34f, 1f));
         confirm.onClick.AddListener(presenter.ConfirmDecision);
         timerModeButton.onClick.AddListener(presenter.CycleTimerMode);
         back.onClick.AddListener(presenter.ReturnToCalendar);
@@ -184,9 +260,10 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
         floor.GetComponent<Renderer>().sharedMaterial = CreateMaterial(new Color(0.055f, 0.11f, 0.22f, 1f));
         GameObject focal = GameObject.CreatePrimitive(PrimitiveType.Cube);
         focal.name = "VerticalSliceDecisionFocalBlockout";
-        focal.transform.position = new Vector3(0f, activity == CampaignActivity.Rally ? 0.4f : 0f, 9f);
-        focal.transform.localScale = activity == CampaignActivity.Rally ? new Vector3(7f, 1.2f, 0.6f) : new Vector3(4.5f, 0.6f, 2.3f);
-        focal.GetComponent<Renderer>().sharedMaterial = CreateMaterial(activity == CampaignActivity.Rally ? new Color(0.95f, 0.37f, 0.36f, 1f) : new Color(0.25f, 0.55f, 1f, 1f));
+        bool isPublicBlockout = activity == CampaignActivity.Rally || activity == CampaignActivity.Crisis;
+        focal.transform.position = new Vector3(0f, isPublicBlockout ? 0.4f : 0f, 9f);
+        focal.transform.localScale = isPublicBlockout ? new Vector3(7f, 1.2f, 0.6f) : new Vector3(4.5f, 0.6f, 2.3f);
+        focal.GetComponent<Renderer>().sharedMaterial = CreateMaterial(isPublicBlockout ? new Color(0.95f, 0.37f, 0.36f, 1f) : new Color(0.25f, 0.55f, 1f, 1f));
         var lightObject = new GameObject("VerticalSliceDecisionKeyLight");
         Light light = lightObject.AddComponent<Light>();
         light.type = LightType.Directional;
@@ -329,6 +406,8 @@ public sealed class VerticalSliceSceneBootstrap : MonoBehaviour
             case CampaignActivity.Rally: return "Acto político";
             case CampaignActivity.Interview: return "Entrevista periodística";
             case CampaignActivity.Negotiation: return "Negociación política";
+            case CampaignActivity.WeeklyMeeting: return "Mesa semanal de campaña";
+            case CampaignActivity.Crisis: return "Crisis del día";
             default: return activity.ToString();
         }
     }

@@ -14,13 +14,18 @@ public sealed class CampaignDecisionPlan
         IEnumerable<ElectoralImpact> impacts,
         IEnumerable<string> selectedOptionIds,
         IEnumerable<PoliticalRelationshipChange> relationshipChanges = null,
-        IEnumerable<CampaignPromiseDefinition> promises = null)
+        IEnumerable<CampaignPromiseDefinition> promises = null,
+        IEnumerable<CampaignDeferredConsequenceDefinition> deferredConsequences = null,
+        decimal rivalImpactMagnitude = 0m,
+        string rivalResponseId = null,
+        string contextId = null)
     {
         if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("A decision id is required.", nameof(id));
         if (string.IsNullOrWhiteSpace(actorId)) throw new ArgumentException("A decision actor is required.", nameof(actorId));
         if (cost < 0m) throw new ArgumentOutOfRangeException(nameof(cost));
         if (impacts == null) throw new ArgumentNullException(nameof(impacts));
         if (selectedOptionIds == null) throw new ArgumentNullException(nameof(selectedOptionIds));
+        if (rivalImpactMagnitude < -100m || rivalImpactMagnitude > 100m) throw new ArgumentOutOfRangeException(nameof(rivalImpactMagnitude));
 
         Id = id;
         Activity = activity;
@@ -34,6 +39,12 @@ public sealed class CampaignDecisionPlan
         Promises = promises == null
             ? Array.Empty<CampaignPromiseDefinition>()
             : CopyItems(promises, nameof(promises));
+        DeferredConsequences = deferredConsequences == null
+            ? Array.Empty<CampaignDeferredConsequenceDefinition>()
+            : CopyItems(deferredConsequences, nameof(deferredConsequences));
+        RivalImpactMagnitude = rivalImpactMagnitude;
+        RivalResponseId = string.IsNullOrWhiteSpace(rivalResponseId) ? null : rivalResponseId;
+        ContextId = string.IsNullOrWhiteSpace(contextId) ? "nacional" : contextId;
 
         if (SelectedOptionIds.Count == 0)
         {
@@ -49,6 +60,10 @@ public sealed class CampaignDecisionPlan
     public IReadOnlyList<string> SelectedOptionIds { get; }
     public IReadOnlyList<PoliticalRelationshipChange> RelationshipChanges { get; }
     public IReadOnlyList<CampaignPromiseDefinition> Promises { get; }
+    public IReadOnlyList<CampaignDeferredConsequenceDefinition> DeferredConsequences { get; }
+    public decimal RivalImpactMagnitude { get; }
+    public string RivalResponseId { get; }
+    public string ContextId { get; }
 
     public CampaignActionDefinition CreateActionDefinition()
     {

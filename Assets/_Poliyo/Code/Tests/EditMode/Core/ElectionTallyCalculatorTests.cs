@@ -11,11 +11,11 @@ public sealed class ElectionTallyCalculatorTests
         var highWeight = new MicroElector("large", "a", 100m, 100m, new[]
         {
             new CandidateElectoralState("player", 50m, 60m, 0m),
-            new CandidateElectoralState("rival", 50m, 40m, 0m),
+            new CandidateElectoralState("rival", 40m, 40m, 0m),
         });
         var lowWeight = new MicroElector("small", "b", 10m, 100m, new[]
         {
-            new CandidateElectoralState("player", 50m, 0m, 0m),
+            new CandidateElectoralState("player", 0m, 0m, 0m),
             new CandidateElectoralState("rival", 50m, 100m, 0m),
         });
 
@@ -31,8 +31,8 @@ public sealed class ElectionTallyCalculatorTests
     {
         var elector = new MicroElector("elector", "locality", 100m, 80m, new[]
         {
-            new CandidateElectoralState("player", 50m, 45m, 10m),
-            new CandidateElectoralState("rival", 50m, 35m, 10m),
+            new CandidateElectoralState("player", 45m, 45m, 10m),
+            new CandidateElectoralState("rival", 35m, 35m, 10m),
         }, blankVoteIntention: 10m, undecidedIntention: 10m);
 
         var tally = ElectionTallyCalculator.Calculate(new[] { elector }, new[] { "player", "rival" });
@@ -42,6 +42,28 @@ public sealed class ElectionTallyCalculatorTests
         Assert.That(tally.BlankVotes, Is.EqualTo(8m));
         Assert.That(tally.UndecidedVotes, Is.EqualTo(8m));
         Assert.That(tally.GetValidVoteShare("player"), Is.EqualTo(45m / 80m * 100m));
+    }
+
+    [Test]
+    public void NormalizeDisplayCounts_RoundsWeightedVotesWithoutFractionsAndKeepsTotal()
+    {
+        var tally = new ElectionTally();
+        tally.AddCandidateVotes("player", 203.5m);
+        tally.AddCandidateVotes("rival", 102.5m);
+        tally.AddBlankVotes(50.5m);
+        tally.AddUndecidedVotes(50.5m);
+        tally.AddParticipation(407m);
+
+        ElectionVoteCounts normalized = ElectionVoteCountNormalizer.Normalize(tally, new[] { "player", "rival" });
+
+        Assert.That(normalized.GetCandidateVotes("player"), Is.EqualTo(204L));
+        Assert.That(normalized.GetCandidateVotes("rival"), Is.EqualTo(103L));
+        Assert.That(normalized.ValidVotes, Is.EqualTo(307L));
+        Assert.That(normalized.BlankVotes, Is.EqualTo(50L));
+        Assert.That(normalized.UndecidedVotes, Is.EqualTo(50L));
+        Assert.That(normalized.ParticipatingVotes, Is.EqualTo(407L));
+        Assert.That(normalized.ValidVotes + normalized.BlankVotes + normalized.UndecidedVotes,
+            Is.EqualTo(normalized.ParticipatingVotes));
     }
 }
 }

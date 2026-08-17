@@ -76,6 +76,8 @@ public enum CampaignActivityId
     Rally,
     Interview,
     Negotiation,
+    WeeklyMeeting,
+    Crisis,
 }
 
 [Serializable]
@@ -139,6 +141,12 @@ public sealed class CampaignDecisionOptionDefinition
     public float GrievanceDelta;
     public string PromiseId;
     public string PromiseDescription;
+    [TextArea(2, 4)] public string RivalResponse;
+    public float RivalImpactDelta;
+    public string DeferredMetricId;
+    public float DeferredImpactDelta;
+    public int DeferredDayOffset = 1;
+    public string DeferredEffectId;
 }
 
 internal static class CampaignContentDefaults
@@ -201,13 +209,87 @@ internal static class CampaignContentDefaults
         {
             CreateRally(),
             CreateInterview("nt-fidel", "NT", "Fidel", "El noticiero nacional pide una frase que pueda titular sin contexto."),
-            CreateInterview("nacion-lujan", "La Nación", "Luján", "La cronista llega con una carpeta de promesas incumplidas."),
+            CreateInterview("nacion-lujan", "Nación", "Luján", "La cronista llega con una carpeta de promesas incumplidas."),
             CreateInterview("5c-silvester", "5C", "Silvester", "El canal comunitario prioriza el costo de vida y la cercanía."),
             CreateInterview("cadena-samu", "Cadena", "Samu", "La señal de cable quiere una respuesta rápida y compartible."),
             CreateInterview("n48-neiman", "N48", "Neiman", "La entrevista nocturna ofrece tiempo, pero no indulgencia."),
             CreateNegotiation("rival-contr", "Contr", "La rivalidad ofrece un acuerdo territorial si cedés una bandera.", "reconciliación pública"),
             CreateNegotiation("aliada-juana", "Juana Funes", "Una dirigente aliada pide información y una promesa verificable.", "apoyo territorial"),
             CreateNegotiation("medio-cadena", "Cadena", "Un medio propone cobertura favorable a cambio de acceso.", "entrevista exclusiva"),
+            CreateWeeklyMeeting(),
+            CreateCrisis(),
+        };
+    }
+
+    private static CampaignDecisionScenarioDefinition CreateWeeklyMeeting()
+    {
+        return new CampaignDecisionScenarioDefinition
+        {
+            Id = "weekly-meeting-slice",
+            ActivityId = "WeeklyMeeting",
+            ActorId = "mesa-campana",
+            ActorDisplayName = "Mesa de campaña",
+            Context = "La semana empieza con información incompleta: cada área trae una lectura distinta del tablero y no todas las urgencias caben en la agenda.",
+            KnownSignal = "El diagnóstico combina noticias, equipo y territorio; ninguna fuente representa por sí sola al electorado.",
+            TargetMode = "National",
+            BaseCost = 0f,
+            Steps = new[]
+            {
+                CreateStep("¿Qué diagnóstico ponés primero sobre la mesa?", new[]
+                {
+                    Option("territorio", "Priorizar el territorio", "La campaña reconoce una señal local aunque todavía no conoce toda su causa.", "riesgo bajo", "El equipo ordena la agenda alrededor de una jurisdicción concreta.", "VotingIntention", 0.9m),
+                    Option("confianza", "Priorizar la confianza", "Leer la relación con la candidatura antes de perseguir una cifra.", "riesgo medio", "La mesa pide sostener el tono y demostrar coherencia.", "Trust", 1.2m),
+                    Option("rechazo", "Priorizar el rechazo", "Tratar la resistencia como un problema activo y no como ruido.", "riesgo alto", "La oposición encuentra un ángulo para discutir la agenda.", "Rejection", -1.0m, rivalImpact: 0.5m, rivalResponse: "El rival aprovecha que la campaña expone su punto débil."),
+                }),
+                CreateStep("¿Qué prioridad sobrevive a la discusión?", new[]
+                {
+                    Option("escucha", "Escucha territorial", "Convertir una señal en conversaciones verificables.", "riesgo bajo", "La estructura recibe una tarea concreta para la semana.", "Trust", 1.0m),
+                    Option("medios", "Agenda de medios", "Buscar una conversación nacional que ordene el mensaje.", "riesgo medio", "La prensa detecta una línea clara, pero exige consistencia.", "VotingIntention", 1.1m),
+                    Option("equipo", "Cuidar al equipo", "Reservar capacidad para que las urgencias no rompan la operación.", "riesgo medio", "La mesa baja el ritmo y gana margen para investigar.", "Participation", 1.1m),
+                }),
+                CreateStep("Aparece un desacuerdo entre áreas. ¿Cómo lo resolvés?", new[]
+                {
+                    Option("prueba", "Resolver con una prueba corta", "Elegir una acción acotada y medir su reacción.", "riesgo bajo", "La discusión queda abierta, pero la campaña obtiene una señal nueva.", "Trust", 0.8m),
+                    Option("voto", "Pedir una decisión de la mesa", "Cerrar el desacuerdo con una mayoría explícita.", "riesgo medio", "La mayoría ordena la semana; la minoría conserva una objeción.", "VotingIntention", 1.0m, obligation: 1m),
+                    Option("postergar", "Postergar y sostener dos líneas", "Conservar flexibilidad a cambio de un mensaje menos nítido.", "riesgo alto", "Las áreas compiten por la interpretación de la semana.", "Rejection", 0.7m, grievance: 1m),
+                }),
+            },
+        };
+    }
+
+    private static CampaignDecisionScenarioDefinition CreateCrisis()
+    {
+        return new CampaignDecisionScenarioDefinition
+        {
+            Id = "crisis-puente",
+            ActivityId = "Crisis",
+            ActorId = "crisis-puente",
+            ActorDisplayName = "Crisis del puente de San Telmo",
+            Context = "Una falla en una obra pública deja aislado a un barrio. Hay videos, rumores y una denuncia todavía incompleta; responder rápido puede ordenar la conversación o confirmar una versión equivocada.",
+            KnownSignal = "La fuente primaria aún no está verificada. La demora protege la precisión, pero también deja el espacio público en manos del rival.",
+            TargetMode = "National",
+            BaseCost = 25f,
+            Steps = new[]
+            {
+                CreateStep("¿Qué hacés con la primera información?", new[]
+                {
+                    Option("verificar", "Verificar antes de hablar", "Mandar una revisión corta y aceptar perder la primera ola de atención.", "riesgo medio", "La prensa espera una confirmación; el barrio valora que no improvises.", "Trust", 0.8m, deferredDelta: 1.4m, deferredMetric: "Trust", deferredDays: 2, deferredEffect: "crisis-confirmed-response", rivalResponse: "El rival ocupa la primera conferencia con la versión más estridente.", costModifier: 10m),
+                    Option("responder", "Responder con lo comprobable", "Separar lo que sabés de lo que todavía no podés afirmar.", "riesgo medio", "El público recibe un primer compromiso; el rival exige una fecha.", "VotingIntention", 1.4m, deferredDelta: -1.6m, deferredMetric: "Rejection", deferredDays: 2, deferredEffect: "crisis-follow-up-pressure", rivalImpact: 0.9m, rivalResponse: "El rival presenta la respuesta como insuficiente y pide responsables.", costModifier: 25m),
+                    Option("ocultar", "Esperar sin comunicar", "Cuidar la investigación y dejar la escena abierta.", "riesgo alto", "El silencio se vuelve parte de la noticia durante la tarde.", "Rejection", 1.2m, deferredDelta: 2.2m, deferredMetric: "Rejection", deferredDays: 1, deferredEffect: "crisis-silence-backlash", rivalImpact: 1.4m, rivalResponse: "El rival instala que la campaña está escondiendo información.", costModifier: 0m),
+                }),
+                CreateStep("¿Qué costo de oportunidad aceptás?", new[]
+                {
+                    Option("barrio", "Desviar equipo al barrio", "La operación pierde una actividad nacional, pero obtiene testimonios propios.", "riesgo medio", "La campaña llega tarde a otro tema; el territorio responde.", "Trust", 1.0m, deferredDelta: 1.0m, deferredMetric: "VotingIntention", deferredDays: 3, deferredEffect: "crisis-territorial-follow-up", costModifier: 50m),
+                    Option("medios", "Sostener la agenda de medios", "Cuidar el mensaje nacional mientras el equipo local informa.", "riesgo alto", "La cobertura nacional mejora, aunque el barrio pide presencia.", "VotingIntention", 1.2m, deferredDelta: -1.0m, deferredMetric: "Trust", deferredDays: 3, deferredEffect: "crisis-distance-cost", costModifier: 20m),
+                    Option("equipo", "Proteger la operación", "Reservar recursos para que una crisis no borre toda la semana.", "riesgo bajo", "El equipo mantiene capacidad; la respuesta pública pierde volumen.", "Participation", 0.9m, deferredDelta: 0.8m, deferredMetric: "Participation", deferredDays: 2, deferredEffect: "crisis-mobilization", costModifier: 10m),
+                }),
+                CreateStep("¿Cómo cerrás la primera jornada?", new[]
+                {
+                    Option("compromiso", "Publicar un compromiso verificable", "Dar una fecha y una fuente para revisar si se cumplió.", "riesgo medio", "La conversación pasa de la indignación a una cuenta pendiente.", "Trust", 1.3m, obligation: 2m, deferredDelta: 1.5m, deferredMetric: "Trust", deferredDays: 4, deferredEffect: "crisis-commitment-check", costModifier: 15m),
+                    Option("responsables", "Pedir responsabilidades", "Marcar una línea política antes de tener todo el expediente.", "riesgo alto", "La acusación consigue titulares y abre un frente legal.", "Rejection", 1.0m, grievance: 2m, rivalImpact: 0.7m, rivalResponse: "El rival responde con una denuncia cruzada y obliga a la campaña a documentar.", costModifier: 10m),
+                    Option("acompanar", "Acompañar sin prometer de más", "Sostener presencia y reconocer los límites de la información.", "riesgo bajo", "El barrio recibe una respuesta sobria; la noticia pierde dramatismo.", "Trust", 1.0m, deferredDelta: 1.1m, deferredMetric: "Trust", deferredDays: 2, deferredEffect: "crisis-presence-confirmed", costModifier: 5m),
+                }),
+            },
         };
     }
 
@@ -327,7 +409,9 @@ internal static class CampaignContentDefaults
     private static CampaignDecisionOptionDefinition Option(
         string id, string label, string description, string risk, string reaction, string metric, decimal delta,
         decimal trust = 0m, decimal affinity = 0m, decimal obligation = 0m, decimal grievance = 0m,
-        string promise = null, string promiseDescription = null)
+        string promise = null, string promiseDescription = null, decimal rivalImpact = 0m, string rivalResponse = null,
+        decimal deferredDelta = 0m, string deferredMetric = null, int deferredDays = 1, string deferredEffect = null,
+        decimal costModifier = 0m)
     {
         return new CampaignDecisionOptionDefinition
         {
@@ -336,6 +420,7 @@ internal static class CampaignContentDefaults
             Description = description,
             RiskLabel = risk,
             ImmediateReaction = reaction,
+            CostModifier = (float)costModifier,
             MetricId = metric,
             ImpactDelta = (float)delta,
             TrustDelta = (float)trust,
@@ -344,6 +429,12 @@ internal static class CampaignContentDefaults
             GrievanceDelta = (float)grievance,
             PromiseId = promise,
             PromiseDescription = promiseDescription,
+            RivalResponse = rivalResponse,
+            RivalImpactDelta = (float)rivalImpact,
+            DeferredMetricId = deferredMetric,
+            DeferredImpactDelta = (float)deferredDelta,
+            DeferredDayOffset = deferredDays,
+            DeferredEffectId = deferredEffect,
         };
     }
 

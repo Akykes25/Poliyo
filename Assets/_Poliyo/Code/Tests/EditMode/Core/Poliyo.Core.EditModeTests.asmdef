@@ -5,6 +5,7 @@
                        "Poliyo.Core",
                        "Poliyo.Simulation",
                        "Poliyo.Application",
+                       "Poliyo.Content",
                        "Poliyo.Presentation",
                        "Unity.ugui",
                        "Unity.TextMeshPro"

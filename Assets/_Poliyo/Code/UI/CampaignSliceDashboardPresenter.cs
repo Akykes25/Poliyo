@@ -3,6 +3,8 @@ using Poliyo.Application;
 using Poliyo.Simulation;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Poliyo.Presentation
@@ -115,7 +117,37 @@ public sealed class CampaignSliceDashboardPresenter : MonoBehaviour
     {
         try
         {
-            _host.AdvanceDay();
+            if (_host.CanResolveWeeklyMeeting)
+            {
+                OpenDecisionScene(CampaignActivity.WeeklyMeeting);
+                return;
+            }
+
+            if (_host.CanResolveCrisis)
+            {
+                OpenDecisionScene(CampaignActivity.Crisis);
+                return;
+            }
+
+            if (_host.CanResolveSliceClosure)
+            {
+                CampaignSliceClosureResult closure = _host.ResolveSliceClosure();
+                SetTextIfPresent(_nextDayNote, FormatSliceClosure(closure));
+                SceneManager.LoadScene("ElectionResult");
+                return;
+            }
+
+            CampaignDayAdvanceResult result = _host.AdvanceDay();
+            if (result.ElectionResult != null)
+            {
+                SceneManager.LoadScene("ElectionResult");
+                return;
+            }
+
+            if (result.ElectionUnavailable)
+            {
+                SetTextIfPresent(_nextDayNote, "No se pudo abrir el escrutinio: falta el catálogo territorial de la campaña.");
+            }
         }
         catch (InvalidOperationException exception)
         {
@@ -125,20 +157,17 @@ public sealed class CampaignSliceDashboardPresenter : MonoBehaviour
 
     public void TogglePressPanel()
     {
-        if (_newsPanel == null)
-        {
-            return;
-        }
-
-        if (_newsPanel.activeSelf)
+        if (_newsPanel != null && _newsPanel.activeSelf)
         {
             _pressInteractionScope?.Close();
             _newsPanel.SetActive(false);
             return;
         }
 
-        _newsPanel.SetActive(true);
-        GetPressInteractionScope().Open();
+        // Prensa is a navigable screen, not a modal interpretation of the
+        // latest headline. Keep the old method name for scene compatibility,
+        // but route every new activation to the authored Press scene.
+        SceneManager.LoadScene("Press");
     }
 
     private void Refresh()
@@ -171,7 +200,24 @@ public sealed class CampaignSliceDashboardPresenter : MonoBehaviour
         RefreshTerritory();
         RefreshNewsTicker();
         RefreshPriority();
-        _nextDayButton.interactable = calendar.CanAdvance && _host.Session.ElectionResult == null;
+        bool requiresPriorityResolution = _host.CanResolveWeeklyMeeting || _host.CanResolveCrisis;
+        bool closureReadoutAvailable = _host.CanResolveSliceClosure;
+        bool electionReadoutAvailable = calendar.IsElectionDay && _host.Session.ElectionResult == null;
+        bool runoffReadoutAvailable = _host.CanResolveRunoff;
+        if (_nextDayButton != null)
+        {
+            _nextDayButton.interactable = requiresPriorityResolution || closureReadoutAvailable || electionReadoutAvailable || runoffReadoutAvailable || (calendar.CanAdvance &&
+                _host.Session.ElectionResult == null &&
+                _host.Session.SliceClosureResult == null &&
+                !requiresPriorityResolution);
+        }
+        SetButtonLabel(
+            _nextDayButton,
+            _host.CanResolveWeeklyMeeting ? "Resolver mesa semanal" :
+            _host.CanResolveCrisis ? "Resolver crisis" :
+            _host.CanResolveSliceClosure ? "Abrir cierre" :
+            runoffReadoutAvailable ? "Resolver balotaje" :
+            electionReadoutAvailable ? "Abrir escrutinio" : "Cerrar día y continuar");
     }
 
     private decimal GetNationalMetric(ElectoralMetric metric)
@@ -214,12 +260,57 @@ public sealed class CampaignSliceDashboardPresenter : MonoBehaviour
     private void RefreshPriority()
     {
         CampaignElectionResult electionResult = _host.Session.ElectionResult;
+        CampaignSliceClosureResult closure = _host.Session.SliceClosureResult;
+        if (_host.CanResolveRunoff)
+        {
+            SetTextIfPresent(_priorityTitle, "Balotaje: quedan dos partidos");
+            SetTextIfPresent(
+                _priorityCopy,
+                $"La primera vuelta dejó a {GetCandidateName(_host.Session.ActiveElectionCandidateIds[0])} y " +
+                $"{GetCandidateName(_host.Session.ActiveElectionCandidateIds[1])}. La mesa vuelve a enfocarse sólo en ellos.");
+            SetTextIfPresent(_nextDayNote, "Acción requerida · resolvé el balotaje para cerrar la campaña.");
+            return;
+        }
+
         if (electionResult != null)
         {
             decimal playerShare = electionResult.Tally.GetValidVoteShare(CampaignCandidateIds.Player);
             SetTextIfPresent(_priorityTitle, electionResult.Outcome.RequiresRunoff ? "Balotaje confirmado" : "Primera vuelta resuelta");
             SetTextIfPresent(_priorityCopy, FormatElectionResult(electionResult, playerShare));
             SetTextIfPresent(_nextDayNote, "El resultado quedó guardado y puede reproducirse desde el autosave.");
+            return;
+        }
+
+        if (closure != null)
+        {
+            decimal playerShare = closure.Tally.GetValidVoteShare(CampaignCandidateIds.Player);
+            SetTextIfPresent(_priorityTitle, "Cierre del slice");
+            SetTextIfPresent(_priorityCopy, FormatSliceClosure(closure) + $" Tu candidatura: {playerShare:0.0}%.");
+            SetTextIfPresent(_nextDayNote, "El cierre queda persistido; esta prueba de 14 días termina aquí.");
+            return;
+        }
+
+        if (_host.CanResolveWeeklyMeeting)
+        {
+            SetTextIfPresent(_priorityTitle, "Resolver la mesa semanal");
+            SetTextIfPresent(_priorityCopy, "La semana terminó. Abrí la mesa para ver el diagnóstico, las preguntas y las respuestas antes de continuar.");
+            SetTextIfPresent(_nextDayNote, "Acción requerida · el botón principal abre la Mesa semanal.");
+            return;
+        }
+
+        if (_host.CanResolveCrisis)
+        {
+            SetTextIfPresent(_priorityTitle, "Resolver la crisis abierta");
+            SetTextIfPresent(_priorityCopy, "La información es incompleta: cada respuesta cambia el tablero ahora y deja una consecuencia diferida.");
+            SetTextIfPresent(_nextDayNote, "La crisis se registra como una decisión, no como un botón de impacto fijo.");
+            return;
+        }
+
+        if (_host.CanResolveSliceClosure)
+        {
+            SetTextIfPresent(_priorityTitle, "Abrir cierre del slice");
+            SetTextIfPresent(_priorityCopy, "Ya están reunidas las decisiones mínimas. Abrí el cierre para ver el escrutinio simulado y los factores que explican el resultado.");
+            SetTextIfPresent(_nextDayNote, "Acción requerida · el botón principal abre el cierre causal.");
             return;
         }
 
@@ -235,6 +326,12 @@ public sealed class CampaignSliceDashboardPresenter : MonoBehaviour
         }
 
         SetTextIfPresent(_nextDayNote, "Se guardará el estado al resolver la jornada.");
+    }
+
+    private void OpenDecisionScene(CampaignActivity activity)
+    {
+        CampaignGameSessionHost.SetPendingDecisionActivity(activity);
+        SceneManager.LoadScene("PoliticalRally");
     }
 
     private void RefreshTerritory()
@@ -275,6 +372,14 @@ public sealed class CampaignSliceDashboardPresenter : MonoBehaviour
         }
 
         return $"{GetCandidateName(result.Outcome.RunoffFirstId)} y {GetCandidateName(result.Outcome.RunoffSecondId)} pasan al balotaje. Tu candidatura obtuvo {playerShare:0.0}%.";
+    }
+
+    private static string FormatSliceClosure(CampaignSliceClosureResult closure)
+    {
+        string outcome = closure.Outcome.RequiresRunoff
+            ? $"balotaje: {GetCandidateName(closure.Outcome.RunoffFirstId)} vs. {GetCandidateName(closure.Outcome.RunoffSecondId)}"
+            : "ganador: " + GetCandidateName(closure.Outcome.WinnerId);
+        return $"Día {closure.Day} · {outcome} · {closure.DecisionCount} decisiones · {closure.DecisiveFactors.Count} factores causales.";
     }
 
     private static string GetCandidateName(string candidateId)
@@ -318,6 +423,13 @@ public sealed class CampaignSliceDashboardPresenter : MonoBehaviour
         {
             label.text = value;
         }
+    }
+
+    private static void SetButtonLabel(Button button, string value)
+    {
+        if (button == null) return;
+        TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label != null) label.text = value;
     }
 }
 }

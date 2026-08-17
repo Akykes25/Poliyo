@@ -10,12 +10,17 @@ public sealed class CampaignRuntime
 {
     private readonly IReadOnlyList<MonthlyCommitment> _monthlyCommitments;
 
-    public CampaignRuntime(CampaignSeed seed, decimal initialFunds, IReadOnlyList<MonthlyCommitment> monthlyCommitments)
+    public CampaignRuntime(
+        CampaignSeed seed,
+        decimal initialFunds,
+        IReadOnlyList<MonthlyCommitment> monthlyCommitments,
+        bool requireWeeklyMeetings = false)
         : this(
             new CampaignState(seed),
             new CampaignEconomy(initialFunds),
             new CampaignPhaseMachine(),
-            monthlyCommitments)
+            monthlyCommitments,
+            requireWeeklyMeetings)
     {
     }
 
@@ -23,7 +28,8 @@ public sealed class CampaignRuntime
         CampaignState state,
         CampaignEconomy economy,
         CampaignPhaseMachine phaseMachine,
-        IReadOnlyList<MonthlyCommitment> monthlyCommitments)
+        IReadOnlyList<MonthlyCommitment> monthlyCommitments,
+        bool requireWeeklyMeetings)
     {
         if (state == null) throw new ArgumentNullException(nameof(state));
         if (economy == null) throw new ArgumentNullException(nameof(economy));
@@ -34,11 +40,13 @@ public sealed class CampaignRuntime
         Economy = economy;
         PhaseMachine = phaseMachine;
         _monthlyCommitments = monthlyCommitments;
+        RequireWeeklyMeetings = requireWeeklyMeetings;
     }
 
     public CampaignState State { get; }
     public CampaignEconomy Economy { get; }
     public CampaignPhaseMachine PhaseMachine { get; }
+    public bool RequireWeeklyMeetings { get; }
 
     public static CampaignRuntime Restore(CampaignSaveData saveData, IReadOnlyList<MonthlyCommitment> monthlyCommitments)
     {
@@ -48,13 +56,37 @@ public sealed class CampaignRuntime
             new CampaignState(CampaignSaveMapper.GetSeed(saveData), saveData.CurrentDay),
             new CampaignEconomy(saveData.Funds, saveData.UnpaidObligations),
             CampaignPhaseMachine.Restore(phase),
-            monthlyCommitments);
+            monthlyCommitments,
+            saveData.RequireWeeklyMeetings);
     }
 
     public void StartCampaign()
     {
         PhaseMachine.MoveTo(CampaignPhase.WeeklyMeeting);
+        if (!RequireWeeklyMeetings)
+        {
+            PhaseMachine.MoveTo(CampaignPhase.Planning);
+        }
+    }
+
+    public void CompleteWeeklyMeeting()
+    {
+        if (PhaseMachine.Current != CampaignPhase.WeeklyMeeting)
+        {
+            throw new InvalidOperationException("There is no weekly meeting waiting for a resolution.");
+        }
+
         PhaseMachine.MoveTo(CampaignPhase.Planning);
+    }
+
+    public void CompleteSliceClosure()
+    {
+        if (PhaseMachine.Current != CampaignPhase.Planning && PhaseMachine.Current != CampaignPhase.ElectoralFog)
+        {
+            throw new InvalidOperationException("The slice can only close from a planning phase.");
+        }
+
+        PhaseMachine.MoveTo(CampaignPhase.SliceClosure);
     }
 
     public MonthlyCloseResult AdvanceDay()
@@ -92,7 +124,10 @@ public sealed class CampaignRuntime
         else if (calendar.IsCampaignMeetingDay)
         {
             PhaseMachine.MoveTo(CampaignPhase.WeeklyMeeting);
-            PhaseMachine.MoveTo(CampaignPhase.Planning);
+            if (!RequireWeeklyMeetings)
+            {
+                PhaseMachine.MoveTo(CampaignPhase.Planning);
+            }
         }
         else
         {

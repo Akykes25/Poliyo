@@ -36,6 +36,31 @@ public static class ElectionOutcomeCalculator
             ? new ElectionOutcome(first, null, null)
             : new ElectionOutcome(null, first, second);
     }
+
+    /// <summary>
+    /// Resolves the two-candidate runoff. A tied weighted tally uses the stable
+    /// finalist order as its deterministic tie-breaker until an explicit tie rule
+    /// is introduced by the campaign design.
+    /// </summary>
+    public static ElectionOutcome CalculateRunoff(ElectionTally tally, IReadOnlyList<string> finalistIds)
+    {
+        if (tally == null) throw new ArgumentNullException(nameof(tally));
+        if (finalistIds == null || finalistIds.Count != 2)
+        {
+            throw new ArgumentException("A runoff requires exactly two finalists.", nameof(finalistIds));
+        }
+
+        if (string.IsNullOrWhiteSpace(finalistIds[0]) || string.IsNullOrWhiteSpace(finalistIds[1]) ||
+            finalistIds[0] == finalistIds[1])
+        {
+            throw new ArgumentException("Runoff finalists must be non-empty and distinct.", nameof(finalistIds));
+        }
+
+        string winnerId = tally.GetCandidateVotes(finalistIds[0]) >= tally.GetCandidateVotes(finalistIds[1])
+            ? finalistIds[0]
+            : finalistIds[1];
+        return new ElectionOutcome(winnerId, null, null);
+    }
 }
 
 }
