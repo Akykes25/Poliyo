@@ -361,10 +361,10 @@ MonoBehaviour:
         m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
+          m_ObjectArgumentAssemblyTypeName:
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument: 
+          m_StringArgument:
           m_BoolArgument: 0
         m_CallState: 2
 --- !u!114 &7338952
@@ -732,6 +732,7 @@ MonoBehaviour:
   _rallyButton: {fileID: 2093739579}
   _interviewButton: {fileID: 728371621}
   _negotiationButton: {fileID: 2084015262}
+  _weeklyMeetingButton: {fileID: 1877424223}
   _nextDayButton: {fileID: 1221056346}
 --- !u!224 &77959009
 RectTransform:
@@ -5330,18 +5331,6 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-      - m_Target: {fileID: 215446993}
-        m_TargetAssemblyTypeName: Poliyo.Presentation.CalendarInterviewDrawer, Poliyo.Presentation
-        m_MethodName: Close
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
 --- !u!114 &603351000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6037,16 +6026,17 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 215446993}
-        m_TargetAssemblyTypeName: Poliyo.Presentation.CalendarInterviewDrawer, Poliyo.Presentation
-        m_MethodName: Toggle
+      - m_Target: {fileID: 77959008}
+        m_TargetAssemblyTypeName: Poliyo.Presentation.CampaignCalendarScreenPresenter,
+          Poliyo.Presentation
+        m_MethodName: ResolveInterview
         m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
+          m_ObjectArgumentAssemblyTypeName:
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument: 
+          m_StringArgument:
           m_BoolArgument: 0
         m_CallState: 2
 --- !u!1 &755421281
@@ -15343,7 +15333,20 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1877424224}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 77959008}
+        m_TargetAssemblyTypeName: Poliyo.Presentation.CampaignCalendarScreenPresenter,
+          Poliyo.Presentation
+        m_MethodName: ResolveWeeklyMeetingOrCrisis
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName:
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument:
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1877424224
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using Poliyo.Content;
 using Poliyo.Presentation;
 using Poliyo.Simulation;
 using TMPro;
@@ -26,6 +27,8 @@ public sealed class ProjectIntegrationHealthTests
     private const string PoliticalRallyScenePath = "Assets/_Poliyo/Scenes/PoliticalRally.unity";
     private const string InterviewScenePath = "Assets/_Poliyo/Scenes/Interview.unity";
     private const string PoliticalNegotiationScenePath = "Assets/_Poliyo/Scenes/PoliticalNegotiation.unity";
+    private const string PressScenePath = "Assets/_Poliyo/Scenes/Press.unity";
+    private const string ElectionResultScenePath = "Assets/_Poliyo/Scenes/ElectionResult.unity";
     private const string SampleScenePath = "Assets/_Poliyo/Scenes/Tests/SampleScene.unity";
 
     private static readonly string[] CanonicalScenePaths =
@@ -38,7 +41,9 @@ public sealed class ProjectIntegrationHealthTests
         TeamScenePath,
         PoliticalRallyScenePath,
         InterviewScenePath,
-        PoliticalNegotiationScenePath
+        PoliticalNegotiationScenePath,
+        PressScenePath,
+        ElectionResultScenePath
     };
 
     private static readonly string[] OrthographicScenePaths =
@@ -49,6 +54,8 @@ public sealed class ProjectIntegrationHealthTests
         CampaignCalendarScenePath,
         CampaignMapScenePath,
         TeamScenePath,
+        PressScenePath,
+        ElectionResultScenePath,
     };
 
     private static readonly string[] PerspectiveScenePaths =
@@ -174,6 +181,37 @@ public sealed class ProjectIntegrationHealthTests
         });
     }
 
+    [TestCase(PressScenePath, 4)]
+    [TestCase(ElectionResultScenePath, 5)]
+    public void AuxiliarySliceScene_WhenOpened_HasExpectedRuntimeBootstrap(string scenePath, int expectedSceneKind)
+    {
+        WithPreviewScene(scenePath, scene =>
+        {
+            VerticalSliceSceneBootstrap bootstrap = GetSingleComponent<VerticalSliceSceneBootstrap>(scene);
+            CampaignGameSessionHost host = GetSingleComponent<CampaignGameSessionHost>(scene);
+
+            Assert.That(bootstrap.enabled, Is.True);
+            Assert.That(host.enabled, Is.True);
+            Assert.That(new SerializedObject(bootstrap).FindProperty("_sceneKind").intValue, Is.EqualTo(expectedSceneKind));
+        });
+    }
+
+    [Test]
+    public void CampaignCatalog_UsesCanonicalGddInterviewMedia()
+    {
+        CampaignContentDefinition catalog = AssetDatabase.LoadAssetAtPath<CampaignContentDefinition>("Assets/_Poliyo/Data/CampaignCatalog.asset");
+        Assert.That(catalog, Is.Not.Null);
+
+        string[] actualMedia = catalog.DecisionScenarios
+            .Where(scenario => scenario != null && scenario.ActivityId == "Interview")
+            .Select(scenario => scenario.ActorDisplayName)
+            .ToArray();
+
+        Assert.That(
+            actualMedia,
+            Is.EqualTo(new[] { "NT · Fidel", "Nación · Luján", "5C · Silvester", "Cadena · Samu", "N48 · Neiman" }));
+    }
+
     [TestCaseSource(nameof(CanonicalScenePaths))]
     public void CanonicalScene_WhenOpened_UsesResponsiveCanvasScaling(string scenePath)
     {
@@ -263,7 +301,7 @@ public sealed class ProjectIntegrationHealthTests
             AssertPersistentListener(continueButton, navigator, nameof(UiSceneNavigation.OpenScene), "CampaignSlice");
 
             AssertPersistentListener(newCampaignButton, presenter, nameof(MainMenuScreenPresenter.StartNewCampaign));
-            AssertPersistentListener(newCampaignButton, navigator, nameof(UiSceneNavigation.OpenScene), "CampaignSlice");
+            AssertPersistentListener(newCampaignButton, navigator, nameof(UiSceneNavigation.OpenScene), "TeamSelection");
 
             AssertPersistentListener(loadCampaignButton, presenter, nameof(MainMenuScreenPresenter.LoadAutosave));
             AssertPersistentListener(loadCampaignButton, navigator, nameof(UiSceneNavigation.OpenScene), "CampaignSlice");
@@ -290,6 +328,7 @@ public sealed class ProjectIntegrationHealthTests
                 "CampaignSlice Canvas must include a GraphicRaycaster for UGUI input.");
 
             CampaignSliceDashboardPresenter presenter = GetSingleComponent<CampaignSliceDashboardPresenter>(scene);
+            UiSceneNavigation navigator = GetSingleComponent<UiSceneNavigation>(scene);
             GameObject fogObject = GetSerializedReference<GameObject>(presenter, "_fogOverlay");
             GameObject pressObject = GetSerializedReference<GameObject>(presenter, "_newsPanel");
             Button pressCloseButton = GetSerializedReference<Button>(presenter, "_pressCloseButton");
@@ -298,14 +337,7 @@ public sealed class ProjectIntegrationHealthTests
             GetSerializedReference<TMP_Text>(presenter, "_votingIntentionLabel");
             GetSerializedReference<TMP_Text>(presenter, "_rejectionLabel");
             GetSerializedReference<TMP_Text>(presenter, "_participationLabel");
-            Button[] pressToggleButtons = GetComponentsInScene<Button>(scene)
-                .Where(button => GetPersistentListenerIndexes(
-                    button,
-                    presenter,
-                    nameof(CampaignSliceDashboardPresenter.TogglePressPanel)).Length == 1)
-                .ToArray();
-            Assert.That(pressToggleButtons, Has.Length.EqualTo(2));
-            Button pressButton = pressToggleButtons.Single(button => button != pressCloseButton);
+            Button pressButton = GetSingleNamedComponent<Button>(scene, "Prensa_Btn");
 
             Graphic[] fogGraphics = fogObject.GetComponentsInChildren<Graphic>(includeInactive: true);
             Assert.That(fogGraphics, Is.Not.Empty, "Electoral fog must contain a visible UGUI graphic.");
@@ -321,7 +353,7 @@ public sealed class ProjectIntegrationHealthTests
             Assert.That(pressObject.activeSelf, Is.False, "The press dossier must start closed.");
             Assert.That(pressCloseButton.transform.IsChildOf(pressObject.transform), Is.True);
 
-            AssertPersistentListener(pressButton, presenter, nameof(CampaignSliceDashboardPresenter.TogglePressPanel));
+            AssertPersistentListener(pressButton, navigator, nameof(UiSceneNavigation.OpenScene), "Press");
             AssertPersistentListener(pressCloseButton, presenter, nameof(CampaignSliceDashboardPresenter.TogglePressPanel));
             AssertPersistentListener(nextDayButton, presenter, nameof(CampaignSliceDashboardPresenter.AdvanceDay));
         });
@@ -342,6 +374,24 @@ public sealed class ProjectIntegrationHealthTests
             Assert.That(
                 AssetDatabase.GetAssetPath(drawerScript),
                 Is.EqualTo("Assets/_Poliyo/Code/UI/CalendarInterviewDrawer.cs"));
+        });
+    }
+
+    [Test]
+    public void CampaignCalendar_WhenOpened_WiresActionsToDecisionScenes()
+    {
+        WithPreviewScene(CampaignCalendarScenePath, scene =>
+        {
+            CampaignCalendarScreenPresenter presenter = GetSingleComponent<CampaignCalendarScreenPresenter>(scene);
+            Button rallyButton = GetSerializedReference<Button>(presenter, "_rallyButton");
+            Button interviewButton = GetSerializedReference<Button>(presenter, "_interviewButton");
+            Button negotiationButton = GetSerializedReference<Button>(presenter, "_negotiationButton");
+            Button weeklyMeetingButton = GetSerializedReference<Button>(presenter, "_weeklyMeetingButton");
+
+            AssertPersistentListener(rallyButton, presenter, nameof(CampaignCalendarScreenPresenter.ResolveRally));
+            AssertPersistentListener(interviewButton, presenter, nameof(CampaignCalendarScreenPresenter.ResolveInterview));
+            AssertPersistentListener(negotiationButton, presenter, nameof(CampaignCalendarScreenPresenter.ResolveNegotiation));
+            AssertPersistentListener(weeklyMeetingButton, presenter, nameof(CampaignCalendarScreenPresenter.ResolveWeeklyMeetingOrCrisis));
         });
     }
 

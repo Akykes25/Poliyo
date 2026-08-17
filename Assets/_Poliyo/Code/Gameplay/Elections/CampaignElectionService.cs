@@ -47,6 +47,40 @@ public sealed class CampaignElectionService
         return ResolveFirstRound(campaign, microElectors, resolveUndecided: false);
     }
 
+    /// <summary>Resolves the persistent second round for the two first-round finalists.</summary>
+    public CampaignElectionResult ResolveRunoff(
+        CampaignState campaign,
+        IEnumerable<MicroElector> microElectors,
+        IReadOnlyList<string> finalistIds)
+    {
+        if (campaign == null) throw new ArgumentNullException(nameof(campaign));
+        if (microElectors == null) throw new ArgumentNullException(nameof(microElectors));
+        ValidateFinalists(finalistIds);
+        if (!campaign.Calendar.IsElectionDay)
+        {
+            throw new InvalidOperationException("Runoff results can only be resolved after the first election day.");
+        }
+
+        ElectionTally tally = ElectionTallyCalculator.CalculateRunoffResolved(
+            microElectors,
+            finalistIds,
+            campaign.Seed,
+            _voteResolutionParameters);
+        ElectionOutcome outcome = ElectionOutcomeCalculator.CalculateRunoff(tally, finalistIds);
+        foreach (string finalistId in finalistIds)
+        {
+            campaign.RecordCause(new CauseRecord(
+                campaign.Calendar.CurrentDay,
+                CauseCategory.Election,
+                "runoff",
+                finalistId,
+                "valid-vote-share",
+                tally.GetValidVoteShare(finalistId)));
+        }
+
+        return new CampaignElectionResult(tally, outcome);
+    }
+
     private CampaignElectionResult ResolveFirstRound(
         CampaignState campaign,
         IEnumerable<MicroElector> microElectors,
@@ -79,6 +113,33 @@ public sealed class CampaignElectionService
         }
 
         return new CampaignElectionResult(tally, outcome);
+    }
+
+    private void ValidateFinalists(IReadOnlyList<string> finalistIds)
+    {
+        if (finalistIds == null || finalistIds.Count != 2)
+        {
+            throw new ArgumentException("A runoff requires exactly two finalists.", nameof(finalistIds));
+        }
+
+        var finalistSet = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string finalistId in finalistIds)
+        {
+            if (string.IsNullOrWhiteSpace(finalistId) || !finalistSet.Add(finalistId) || !ContainsCandidate(finalistId))
+            {
+                throw new ArgumentException("Runoff finalists must be known, non-empty and distinct.", nameof(finalistIds));
+            }
+        }
+    }
+
+    private bool ContainsCandidate(string candidateId)
+    {
+        foreach (string knownCandidateId in _candidateIds)
+        {
+            if (knownCandidateId == candidateId) return true;
+        }
+
+        return false;
     }
 }
 }

@@ -9,6 +9,17 @@ public sealed class UiSceneNavigation : MonoBehaviour
 {
     public void OpenScene(string sceneName)
     {
+        OpenSceneInternal(sceneName, false);
+    }
+
+    /// <summary>Returns to the campaign dashboard even when the campaign already has a terminal readout.</summary>
+    public void OpenCampaignDashboard()
+    {
+        OpenSceneInternal("CampaignSlice", true);
+    }
+
+    private static void OpenSceneInternal(string sceneName, bool allowFinishedCampaignDashboard)
+    {
         if (string.IsNullOrWhiteSpace(sceneName))
         {
             throw new ArgumentException("A destination scene name is required.", nameof(sceneName));
@@ -18,6 +29,13 @@ public sealed class UiSceneNavigation : MonoBehaviour
             !CampaignGameSessionHost.Current.IsInitialTeamSelectionComplete)
         {
             SceneManager.LoadScene("TeamSelection");
+            return;
+        }
+
+        if (sceneName == "CampaignSlice" && !allowFinishedCampaignDashboard && CampaignGameSessionHost.Current != null &&
+            (CampaignGameSessionHost.Current.Session.IsPlayerCampaignFinished || CampaignGameSessionHost.Current.Session.SliceClosureResult != null))
+        {
+            SceneManager.LoadScene("ElectionResult");
             return;
         }
 

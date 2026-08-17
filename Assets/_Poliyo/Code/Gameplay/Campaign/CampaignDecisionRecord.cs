@@ -13,7 +13,8 @@ public sealed class CampaignDecisionRecord
         CampaignActivity activity,
         string actorId,
         decimal cost,
-        IEnumerable<string> selectedOptionIds)
+        IEnumerable<string> selectedOptionIds,
+        string contextId = null)
     {
         if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("A decision record id is required.", nameof(id));
         if (string.IsNullOrWhiteSpace(decisionId)) throw new ArgumentException("A decision id is required.", nameof(decisionId));
@@ -38,6 +39,7 @@ public sealed class CampaignDecisionRecord
         ActorId = actorId;
         Cost = cost;
         SelectedOptionIds = copiedOptionIds.AsReadOnly();
+        ContextId = string.IsNullOrWhiteSpace(contextId) ? "nacional" : contextId;
     }
 
     public string Id { get; }
@@ -47,5 +49,6 @@ public sealed class CampaignDecisionRecord
     public string ActorId { get; }
     public decimal Cost { get; }
     public IReadOnlyList<string> SelectedOptionIds { get; }
+    public string ContextId { get; }
 }
 }

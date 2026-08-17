@@ -23,5 +23,29 @@ public sealed class VerticalSliceElectorateFactoryTests
         Assert.That(first[0].GetCandidate(CampaignCandidateIds.Player).VotingIntention,
             Is.EqualTo(second[0].GetCandidate(CampaignCandidateIds.Player).VotingIntention));
     }
+
+    [Test]
+    public void Create_InitializesTrustAtOrBelowVotingIntention()
+    {
+        var localities = new[]
+        {
+            new LocalityElectorateSeed("one", 100),
+            new LocalityElectorateSeed("two", 50),
+            new LocalityElectorateSeed("three", 75),
+        };
+
+        var electorate = VerticalSliceElectorateFactory.Create(new CampaignSeed(20260725UL), localities);
+
+        foreach (MicroElector elector in electorate)
+        {
+            foreach (CandidateElectoralState candidate in elector.Candidates.Values)
+            {
+                Assert.That(
+                    candidate.Trust,
+                    Is.LessThanOrEqualTo(candidate.VotingIntention),
+                    $"Candidate '{candidate.CandidateId}' violates the trust/intention invariant.");
+            }
+        }
+    }
 }
 }

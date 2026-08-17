@@ -10,8 +10,8 @@ public sealed class MicroElectorVotingIntentionTests
     {
         var elector = new MicroElector("elector", "locality", 1m, 70m, new[]
         {
-            new CandidateElectoralState("player", 50m, 40m, 10m),
-            new CandidateElectoralState("rival", 50m, 30m, 10m),
+            new CandidateElectoralState("player", 40m, 40m, 10m),
+            new CandidateElectoralState("rival", 30m, 30m, 10m),
         }, blankVoteIntention: 10m, undecidedIntention: 20m);
 
         elector.Apply("player", ElectoralMetric.VotingIntention, 10m);

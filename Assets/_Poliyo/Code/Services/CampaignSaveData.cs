@@ -6,7 +6,7 @@ namespace Poliyo.Application
 [Serializable]
 public sealed class CampaignSaveData
 {
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 8;
     public const int LegacyElectionRulesVersion = 0;
     public const int CurrentElectionRulesVersion = 1;
 
@@ -19,6 +19,9 @@ public sealed class CampaignSaveData
     public int LastActionDay;
     public int ActivityWeek;
     public int PublicActivitiesThisWeek;
+    public int LastWeeklyMeetingDay;
+    public bool RequireWeeklyMeetings;
+    public bool CrisisResolved;
     public int ElectionRulesVersion = CurrentElectionRulesVersion;
     public string SelectedJurisdictionId;
     public bool TeamSelectionCompleted = true;
@@ -29,7 +32,10 @@ public sealed class CampaignSaveData
     public PoliticalPromiseSaveData[] Promises = Array.Empty<PoliticalPromiseSaveData>();
     public CampaignDecisionRecordSaveData[] DecisionRecords = Array.Empty<CampaignDecisionRecordSaveData>();
     public CauseRecordSaveData[] CauseRecords = Array.Empty<CauseRecordSaveData>();
+    public DeferredConsequenceSaveData[] DeferredConsequences = Array.Empty<DeferredConsequenceSaveData>();
+    public SliceClosureSaveData SliceClosureResult;
     public ElectionResultSaveData ElectionResult;
+    public ElectionResultSaveData RunoffResult;
 }
 
 [Serializable]
@@ -90,6 +96,7 @@ public sealed class CampaignDecisionRecordSaveData
     public string Activity;
     public string ActorId;
     public decimal Cost;
+    public string ContextId;
     public string[] SelectedOptionIds = Array.Empty<string>();
 }
 
@@ -124,6 +131,40 @@ public sealed class NewsItemSaveData
     public decimal Reach;
     public decimal Framing;
     public decimal CurrentIntensity;
+}
+
+[Serializable]
+public sealed class DeferredConsequenceSaveData
+{
+    public string Id;
+    public int DueDay;
+    public string SourceId;
+    public string TargetId;
+    public string EffectId;
+    public string CandidateId;
+    public string Metric;
+    public decimal Magnitude;
+    public string Category;
+}
+
+[Serializable]
+public sealed class SliceClosureSaveData
+{
+    public int Day;
+    public ElectionTallySaveData Tally;
+    public ElectionOutcomeSaveData Outcome;
+    public CampaignCausalFactorSaveData[] DecisiveFactors = Array.Empty<CampaignCausalFactorSaveData>();
+    public int DecisionCount;
+}
+
+[Serializable]
+public sealed class CampaignCausalFactorSaveData
+{
+    public string Category;
+    public string SourceId;
+    public string EffectId;
+    public decimal Magnitude;
+    public int Occurrences;
 }
 
 [Serializable]

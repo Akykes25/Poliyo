@@ -4302,7 +4302,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: EL OBSERVADOR
+  m_text: NT
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -5050,7 +5050,7 @@ MonoBehaviour:
           m_ObjectArgumentAssemblyTypeName: 
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument: CampaignSlice
+          m_StringArgument: TeamSelection
           m_BoolArgument: 0
         m_CallState: 2
 --- !u!114 &1606222076
@@ -5475,7 +5475,7 @@ MonoBehaviour:
   _contentCatalog: {fileID: 11400000, guid: b60e81e60da2c8649a24eea4a446a2ad, type: 2}
   _seed: 20260725
   _initialFunds: 1200
-  _newCampaignStartDay: 1
+  _newCampaignStartDay: 60
 --- !u!4 &1763678000
 Transform:
   m_ObjectHideFlags: 0

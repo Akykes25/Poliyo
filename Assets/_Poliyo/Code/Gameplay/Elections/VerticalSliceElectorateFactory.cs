@@ -45,9 +45,10 @@ public static class VerticalSliceElectorateFactory
                 ? CandidateDistribution - assignedIntention
                 : rawWeights[index] * CandidateDistribution / rawTotal;
             assignedIntention += intention;
+            int trustUpperExclusive = Math.Max(1, intention + 1);
             candidates.Add(new CandidateElectoralState(
                 CampaignCandidateIds.All[index],
-                random.NextInt(40, 66),
+                random.NextInt(0, trustUpperExclusive),
                 intention,
                 random.NextInt(8, 36)));
         }

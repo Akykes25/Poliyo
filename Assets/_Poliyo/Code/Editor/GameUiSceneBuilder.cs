@@ -24,6 +24,12 @@ public static class GameUiSceneBuilder
     private const string MapScenePath = SceneFolder + "/CampaignMap.unity";
     private const string CampaignSliceScenePath = SceneFolder + "/CampaignSlice.unity";
     private const string TeamScenePath = SceneFolder + "/TeamScene.unity";
+    private const string TeamSelectionScenePath = SceneFolder + "/TeamSelection.unity";
+    private const string PoliticalRallyScenePath = SceneFolder + "/PoliticalRally.unity";
+    private const string InterviewScenePath = SceneFolder + "/Interview.unity";
+    private const string PoliticalNegotiationScenePath = SceneFolder + "/PoliticalNegotiation.unity";
+    private const string PressScenePath = SceneFolder + "/Press.unity";
+    private const string ElectionResultScenePath = SceneFolder + "/ElectionResult.unity";
     private const string CampaignCatalogPath = "Assets/_Poliyo/Data/CampaignCatalog.asset";
 
     [MenuItem("Poliyo/UI/Create or Update Prototype Screens")]
@@ -110,7 +116,7 @@ public static class GameUiSceneBuilder
 
         Image clipping = PoliyoUiTheme.CreatePanel(brief.transform, "RoscaliaClipping", PoliyoUiTheme.Ivory);
         PoliyoUiTheme.SetRect(clipping.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40f, -706f), new Vector2(616f, 164f));
-        PoliyoUiTheme.CreateChip(clipping.transform, "ClippingSource", "EL OBSERVADOR", PoliyoUiTheme.Violet, PoliyoUiTheme.White, new Vector2(18f, -18f), new Vector2(170f, 30f), 13f);
+        PoliyoUiTheme.CreateChip(clipping.transform, "ClippingSource", "NT", PoliyoUiTheme.Violet, PoliyoUiTheme.White, new Vector2(18f, -18f), new Vector2(170f, 30f), 13f);
         PoliyoUiTheme.CreateText(clipping.transform, "ClippingHeadline", "“Roscalia exige certezas”\nRoscalia procede a no ofrecer ninguna.", 23f, TextAlignmentOptions.TopLeft, PoliyoUiTheme.Ink, new Vector2(18f, -58f), new Vector2(560f, 82f), FontStyles.Bold);
 
         MainMenuScreenPresenter menuPresenter = editorialField.gameObject.AddComponent<MainMenuScreenPresenter>();
@@ -119,7 +125,7 @@ public static class GameUiSceneBuilder
         UnityEventTools.AddPersistentListener(continueCampaign.onClick, menuPresenter.LoadAutosave);
         UnityEventTools.AddStringPersistentListener(continueCampaign.onClick, navigator.OpenScene, "CampaignSlice");
         UnityEventTools.AddPersistentListener(newCampaign.onClick, menuPresenter.StartNewCampaign);
-        UnityEventTools.AddStringPersistentListener(newCampaign.onClick, navigator.OpenScene, "CampaignSlice");
+        UnityEventTools.AddStringPersistentListener(newCampaign.onClick, navigator.OpenScene, "TeamSelection");
         UnityEventTools.AddPersistentListener(loadCampaign.onClick, menuPresenter.LoadAutosave);
         UnityEventTools.AddStringPersistentListener(loadCampaign.onClick, navigator.OpenScene, "CampaignSlice");
         UnityEventTools.AddPersistentListener(quit.onClick, navigator.QuitGame);
@@ -183,8 +189,7 @@ public static class GameUiSceneBuilder
 
         Button rally = PoliyoUiTheme.CreateButton(calendarPanel.transform, "CapitalRallyButton", "Acto capital", new Vector2(200f, -214f), new Vector2(142f, 48f), PoliyoButtonStyle.Primary, 17f);
         Button interview = PoliyoUiTheme.CreateButton(calendarPanel.transform, "InterviewButton", "Entrevista", new Vector2(548f, -346f), new Vector2(142f, 48f), PoliyoButtonStyle.SelectedNavigation, 17f);
-        Button teamMeeting = PoliyoUiTheme.CreateButton(calendarPanel.transform, "TeamMeetingButton", "Reunión", new Vector2(896f, -478f), new Vector2(142f, 48f), PoliyoButtonStyle.Quiet, 17f);
-        teamMeeting.interactable = false;
+        Button teamMeeting = PoliyoUiTheme.CreateButton(calendarPanel.transform, "TeamMeetingButton", "Mesa / crisis", new Vector2(896f, -478f), new Vector2(142f, 48f), PoliyoButtonStyle.Quiet, 17f);
         PoliyoUiTheme.CreateChip(calendarPanel.transform, "DebateMilestone", "DEBATE", PoliyoUiTheme.Violet, PoliyoUiTheme.White, new Vector2(722f, -742f), new Vector2(142f, 32f), 13f);
         PoliyoUiTheme.CreateChip(calendarPanel.transform, "PollMilestone", "CORTE ENCUESTA", PoliyoUiTheme.Yellow, PoliyoUiTheme.Ink, new Vector2(1070f, -610f), new Vector2(142f, 32f), 12f);
 
@@ -205,28 +210,16 @@ public static class GameUiSceneBuilder
         PoliyoUiTheme.CreateText(actionPanel.transform, "CostLegend", "CLAVE  ·  CORAL: PÚBLICO   TURQUESA: INTERNO   VIOLETA: HITO", 13f, TextAlignmentOptions.Left, new Color32(168, 181, 202, 255), new Vector2(32f, -790f), new Vector2(474f, 42f), FontStyles.Bold);
 
         CampaignCalendarScreenPresenter presenter = calendarPanel.gameObject.AddComponent<CampaignCalendarScreenPresenter>();
-        presenter.Configure(dayLabel, statusLabel, phaseLabel, actionCapacityLabel, rally, interview, negotiation, nextDay);
+        presenter.Configure(dayLabel, statusLabel, phaseLabel, actionCapacityLabel, rally, interview, negotiation, teamMeeting, nextDay);
         UnityEventTools.AddPersistentListener(rally.onClick, presenter.ResolveRally);
+        UnityEventTools.AddPersistentListener(teamMeeting.onClick, presenter.ResolveWeeklyMeetingOrCrisis);
         UnityEventTools.AddPersistentListener(negotiation.onClick, presenter.ResolveNegotiation);
         UnityEventTools.AddPersistentListener(nextDay.onClick, presenter.AdvanceDay);
 
-        Image drawerPanel = PoliyoUiTheme.CreatePanel(canvas.transform, "InterviewDrawer", new Color32(23, 35, 59, 252), true);
-        PoliyoUiTheme.SetRect(drawerPanel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(730f, -184f), new Vector2(1120f, 790f));
-        CanvasGroup drawerCanvasGroup = drawerPanel.gameObject.AddComponent<CanvasGroup>();
-        CalendarInterviewDrawer drawer = drawerPanel.gameObject.AddComponent<CalendarInterviewDrawer>();
-        PoliyoUiTheme.CreateRule(drawerPanel.transform, "DrawerAccent", PoliyoUiTheme.Coral, Vector2.zero, new Vector2(1120f, 12f));
-        PoliyoUiTheme.CreateChip(drawerPanel.transform, "DrawerTypeChip", "APARICIÓN PÚBLICA", PoliyoUiTheme.Yellow, PoliyoUiTheme.Ink, new Vector2(42f, -42f), new Vector2(220f, 34f), 14f);
-        PoliyoUiTheme.CreateText(drawerPanel.transform, "InterviewHeading", "Elegí el medio", 38f, TextAlignmentOptions.Left, PoliyoUiTheme.Ivory, new Vector2(42f, -104f), new Vector2(520f, 56f), FontStyles.Bold);
-        PoliyoUiTheme.CreateText(drawerPanel.transform, "InterviewDescription", "En este vertical slice la entrevista es una acción nacional única: prioriza confianza y consume la actividad pública del día.", 20f, TextAlignmentOptions.TopLeft, new Color32(204, 214, 229, 255), new Vector2(44f, -166f), new Vector2(920f, 66f));
-
-        CreateMediaBrief(drawerPanel.transform, "InterviewBrief", "ENTREVISTA NACIONAL", "Prioriza confianza · alcance nacional", "Costo $35 · una acción", -292f, PoliyoUiTheme.Turquoise);
-        Button confirmInterview = PoliyoUiTheme.CreateButton(drawerPanel.transform, "ConfirmInterviewButton", "Confirmar entrevista", new Vector2(774f, -304f), new Vector2(286f, 58f), PoliyoButtonStyle.Primary, 18f);
-        Button closeDrawer = PoliyoUiTheme.CreateButton(drawerPanel.transform, "CloseInterviewDrawerButton", "Volver al calendario", new Vector2(42f, -684f), new Vector2(350f, 56f), PoliyoButtonStyle.Quiet, 19f);
-        drawer.Configure(drawerCanvasGroup, confirmInterview);
-        UnityEventTools.AddPersistentListener(interview.onClick, drawer.Toggle);
-        UnityEventTools.AddPersistentListener(closeDrawer.onClick, drawer.Close);
-        UnityEventTools.AddPersistentListener(confirmInterview.onClick, presenter.ResolveInterview);
-        UnityEventTools.AddPersistentListener(confirmInterview.onClick, drawer.Close);
+        // Interviews are full decision scenes. Keeping the calendar action
+        // direct prevents a dead-end drawer from masking the authored question
+        // and response flow.
+        UnityEventTools.AddPersistentListener(interview.onClick, presenter.ResolveInterview);
 
         PoliyoUiTheme.SetFirstSelected(eventSystem, rally);
         SaveScene(scene, CalendarScenePath);
@@ -401,10 +394,16 @@ public static class GameUiSceneBuilder
         string[] canonicalOrder =
         {
             MainMenuScenePath,
+            TeamSelectionScenePath,
             CampaignSliceScenePath,
             CalendarScenePath,
             MapScenePath,
-            TeamScenePath
+            TeamScenePath,
+            PoliticalRallyScenePath,
+            InterviewScenePath,
+            PoliticalNegotiationScenePath,
+            PressScenePath,
+            ElectionResultScenePath
         };
 
         var buildScenes = new EditorBuildSettingsScene[canonicalOrder.Length];

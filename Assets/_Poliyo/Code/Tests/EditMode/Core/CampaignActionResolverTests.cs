@@ -13,7 +13,7 @@ public sealed class CampaignActionResolverTests
         var economy = new CampaignEconomy(100m);
         var elector = new MicroElector("elector", "locality", 10m, 70m, new[]
         {
-            new CandidateElectoralState("player", 50m, 40m, 10m),
+            new CandidateElectoralState("player", 50m, 60m, 10m),
         });
         var impact = new ElectoralImpact("rally", "player", ElectoralMetric.Trust, 4m, 1m, 1m, 1m, 1m, 1m, 1m);
         var action = new CampaignActionDefinition("rally", CampaignActivity.Rally, 25m, impact);
@@ -33,7 +33,7 @@ public sealed class CampaignActionResolverTests
         var economy = new CampaignEconomy(10m);
         var elector = new MicroElector("elector", "locality", 10m, 70m, new[]
         {
-            new CandidateElectoralState("player", 50m, 40m, 10m),
+            new CandidateElectoralState("player", 50m, 60m, 10m),
         });
         var impact = new ElectoralImpact("rally", "player", ElectoralMetric.Trust, 4m, 1m, 1m, 1m, 1m, 1m, 1m);
         var action = new CampaignActionDefinition("rally", CampaignActivity.Rally, 25m, impact);

@@ -39,14 +39,14 @@ public sealed class CampaignPhaseMachine
         {
             case CampaignPhase.Creation: return next == CampaignPhase.WeeklyMeeting;
             case CampaignPhase.WeeklyMeeting: return next == CampaignPhase.Planning;
-            case CampaignPhase.Planning: return next == CampaignPhase.DailyResolution || next == CampaignPhase.DecisionScene;
-            case CampaignPhase.DecisionScene: return next == CampaignPhase.DailyResolution;
+            case CampaignPhase.Planning: return next == CampaignPhase.DailyResolution || next == CampaignPhase.DecisionScene || next == CampaignPhase.SliceClosure;
+            case CampaignPhase.DecisionScene: return next == CampaignPhase.DailyResolution || next == CampaignPhase.SliceClosure;
             case CampaignPhase.DailyResolution: return next == CampaignPhase.WeeklyMeeting || next == CampaignPhase.Planning || next == CampaignPhase.ElectoralFog || next == CampaignPhase.ElectoralBan;
-            case CampaignPhase.ElectoralFog: return next == CampaignPhase.DailyResolution || next == CampaignPhase.WeeklyMeeting || next == CampaignPhase.ElectoralBan;
+            case CampaignPhase.ElectoralFog: return next == CampaignPhase.DailyResolution || next == CampaignPhase.WeeklyMeeting || next == CampaignPhase.ElectoralBan || next == CampaignPhase.SliceClosure;
             case CampaignPhase.ElectoralBan: return next == CampaignPhase.ElectionDay;
             case CampaignPhase.ElectionDay: return next == CampaignPhase.Scrutiny;
             case CampaignPhase.Scrutiny: return next == CampaignPhase.Runoff || next == CampaignPhase.Finished;
-            case CampaignPhase.Runoff: return next == CampaignPhase.WeeklyMeeting || next == CampaignPhase.ElectoralFog || next == CampaignPhase.ElectoralBan;
+            case CampaignPhase.Runoff: return next == CampaignPhase.WeeklyMeeting || next == CampaignPhase.ElectoralFog || next == CampaignPhase.ElectoralBan || next == CampaignPhase.Finished;
             default: return false;
         }
     }

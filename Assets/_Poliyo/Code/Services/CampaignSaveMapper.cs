@@ -18,6 +18,7 @@ public static class CampaignSaveMapper
             Funds = runtime.Economy.Funds,
             UnpaidObligations = runtime.Economy.UnpaidObligations,
             Phase = runtime.PhaseMachine.Current.ToString(),
+            RequireWeeklyMeetings = runtime.RequireWeeklyMeetings,
             Electorate = CreateElectorateData(electorate),
         };
     }
@@ -150,12 +151,30 @@ public static class CampaignSaveMapper
         };
     }
 
+    public static ElectionResultSaveData CreateRunoffResultData(CampaignElectionResult runoffResult)
+    {
+        return CreateElectionResultData(runoffResult);
+    }
+
     public static CampaignElectionResult RestoreElectionResult(CampaignSaveData saveData)
     {
         Validate(saveData);
         if (saveData.ElectionResult == null) return null;
 
-        ElectionTallySaveData tallyData = saveData.ElectionResult.Tally;
+        return RestoreElectionResultData(saveData.ElectionResult);
+    }
+
+    public static CampaignElectionResult RestoreRunoffResult(CampaignSaveData saveData)
+    {
+        Validate(saveData);
+        if (saveData.RunoffResult == null) return null;
+
+        return RestoreElectionResultData(saveData.RunoffResult);
+    }
+
+    private static CampaignElectionResult RestoreElectionResultData(ElectionResultSaveData resultData)
+    {
+        ElectionTallySaveData tallyData = resultData.Tally;
         var tally = new ElectionTally();
         tally.AddParticipation(tallyData.ParticipatingWeight);
         foreach (CandidateVoteSaveData candidateVote in tallyData.CandidateVotes)
@@ -166,9 +185,114 @@ public static class CampaignSaveMapper
         tally.AddBlankVotes(tallyData.BlankVotes);
         tally.AddUndecidedVotes(tallyData.UndecidedVotes);
 
-        ElectionOutcomeSaveData outcomeData = saveData.ElectionResult.Outcome;
+        ElectionOutcomeSaveData outcomeData = resultData.Outcome;
         var outcome = new ElectionOutcome(outcomeData.WinnerId, outcomeData.RunoffFirstId, outcomeData.RunoffSecondId);
         return new CampaignElectionResult(tally, outcome);
+    }
+
+    public static SliceClosureSaveData CreateSliceClosureData(CampaignSliceClosureResult closure)
+    {
+        if (closure == null) return null;
+
+        var candidateVotes = new List<CandidateVoteSaveData>(closure.Tally.CandidateVotes.Count);
+        foreach (KeyValuePair<string, decimal> candidateVote in closure.Tally.CandidateVotes)
+        {
+            candidateVotes.Add(new CandidateVoteSaveData
+            {
+                CandidateId = candidateVote.Key,
+                Votes = candidateVote.Value,
+            });
+        }
+
+        var factors = new List<CampaignCausalFactorSaveData>(closure.DecisiveFactors.Count);
+        foreach (CampaignCausalFactor factor in closure.DecisiveFactors)
+        {
+            factors.Add(new CampaignCausalFactorSaveData
+            {
+                Category = factor.Category.ToString(),
+                SourceId = factor.SourceId,
+                EffectId = factor.EffectId,
+                Magnitude = factor.Magnitude,
+                Occurrences = factor.Occurrences,
+            });
+        }
+
+        return new SliceClosureSaveData
+        {
+            Day = closure.Day,
+            Tally = new ElectionTallySaveData
+            {
+                CandidateVotes = candidateVotes.ToArray(),
+                ParticipatingWeight = closure.Tally.ParticipatingWeight,
+                ValidVotes = closure.Tally.ValidVotes,
+                BlankVotes = closure.Tally.BlankVotes,
+                UndecidedVotes = closure.Tally.UndecidedVotes,
+            },
+            Outcome = new ElectionOutcomeSaveData
+            {
+                WinnerId = closure.Outcome.WinnerId,
+                RunoffFirstId = closure.Outcome.RunoffFirstId,
+                RunoffSecondId = closure.Outcome.RunoffSecondId,
+            },
+            DecisiveFactors = factors.ToArray(),
+            DecisionCount = closure.DecisionCount,
+        };
+    }
+
+    public static CampaignSliceClosureResult RestoreSliceClosure(CampaignSaveData saveData)
+    {
+        Validate(saveData);
+        if (saveData.SliceClosureResult == null) return null;
+
+        SliceClosureSaveData closureData = saveData.SliceClosureResult;
+        var tally = RestoreTally(closureData.Tally);
+        var outcome = new ElectionOutcome(
+            closureData.Outcome.WinnerId,
+            closureData.Outcome.RunoffFirstId,
+            closureData.Outcome.RunoffSecondId);
+        var factors = new List<CampaignCausalFactor>(closureData.DecisiveFactors.Length);
+        foreach (CampaignCausalFactorSaveData factorData in closureData.DecisiveFactors)
+        {
+            if (factorData == null || !Enum.TryParse(factorData.Category, out CauseCategory category) ||
+                !Enum.IsDefined(typeof(CauseCategory), category))
+            {
+                throw new InvalidOperationException("The save contains an invalid slice causal factor.");
+            }
+
+            factors.Add(new CampaignCausalFactor(
+                category,
+                factorData.SourceId,
+                factorData.EffectId,
+                factorData.Magnitude,
+                factorData.Occurrences));
+        }
+
+        return new CampaignSliceClosureResult(
+            closureData.Day,
+            tally,
+            outcome,
+            factors,
+            closureData.DecisionCount);
+    }
+
+    private static ElectionTally RestoreTally(ElectionTallySaveData tallyData)
+    {
+        if (tallyData == null || tallyData.CandidateVotes == null)
+        {
+            throw new InvalidOperationException("The save contains an incomplete slice tally.");
+        }
+
+        var tally = new ElectionTally();
+        tally.AddParticipation(tallyData.ParticipatingWeight);
+        foreach (CandidateVoteSaveData candidateVote in tallyData.CandidateVotes)
+        {
+            if (candidateVote == null) throw new InvalidOperationException("The save contains an invalid slice vote total.");
+            tally.AddCandidateVotes(candidateVote.CandidateId, candidateVote.Votes);
+        }
+
+        tally.AddBlankVotes(tallyData.BlankVotes);
+        tally.AddUndecidedVotes(tallyData.UndecidedVotes);
+        return tally;
     }
 
     public static void Validate(CampaignSaveData saveData)
@@ -196,12 +320,14 @@ public static class CampaignSaveMapper
         }
 
         if (saveData.Electorate == null || saveData.TeamMembers == null || saveData.NewsItems == null ||
-            saveData.Relationships == null || saveData.Promises == null || saveData.DecisionRecords == null || saveData.CauseRecords == null)
+            saveData.Relationships == null || saveData.Promises == null || saveData.DecisionRecords == null || saveData.CauseRecords == null ||
+            saveData.DeferredConsequences == null)
         {
             throw new InvalidOperationException("The save contains a missing collection.");
         }
 
-        if (saveData.ElectionResult != null && saveData.CurrentDay != CampaignCalendar.TotalCampaignDays)
+        if ((saveData.ElectionResult != null || saveData.RunoffResult != null) &&
+            saveData.CurrentDay != CampaignCalendar.TotalCampaignDays)
         {
             throw new InvalidOperationException("The save contains an election result before election day.");
         }
@@ -218,6 +344,13 @@ public static class CampaignSaveMapper
         }
 
         ValidateElectionResultData(saveData.ElectionResult);
+        ValidateElectionResultData(saveData.RunoffResult);
+        ValidateRunoffResultData(saveData.ElectionResult, saveData.RunoffResult);
+        ValidateSliceClosureData(saveData.SliceClosureResult);
+        if (saveData.LastWeeklyMeetingDay < 0 || saveData.LastWeeklyMeetingDay > saveData.CurrentDay)
+        {
+            throw new InvalidOperationException("The save contains an invalid weekly meeting day.");
+        }
     }
 
     private static void MigrateInPlace(CampaignSaveData saveData)
@@ -265,6 +398,22 @@ public static class CampaignSaveMapper
                     }
                 }
             }
+        }
+
+        if (saveData.SchemaVersion == 6)
+        {
+            saveData.SchemaVersion = 7;
+            saveData.RequireWeeklyMeetings = true;
+            saveData.LastWeeklyMeetingDay = 0;
+            saveData.CrisisResolved = false;
+            saveData.DeferredConsequences = Array.Empty<DeferredConsequenceSaveData>();
+            saveData.SliceClosureResult = null;
+        }
+
+        if (saveData.SchemaVersion == 7)
+        {
+            saveData.SchemaVersion = 8;
+            saveData.RunoffResult = null;
         }
     }
 
@@ -323,6 +472,7 @@ public static class CampaignSaveMapper
                 Activity = record.Activity.ToString(),
                 ActorId = record.ActorId,
                 Cost = record.Cost,
+                ContextId = record.ContextId,
                 SelectedOptionIds = options.ToArray(),
             });
         }
@@ -349,6 +499,59 @@ public static class CampaignSaveMapper
         }
 
         return data.ToArray();
+    }
+
+    public static DeferredConsequenceSaveData[] CreateDeferredConsequenceData(IEnumerable<CampaignDeferredConsequence> consequences)
+    {
+        if (consequences == null) return Array.Empty<DeferredConsequenceSaveData>();
+
+        var data = new List<DeferredConsequenceSaveData>();
+        foreach (CampaignDeferredConsequence consequence in consequences)
+        {
+            if (consequence == null) throw new ArgumentException("A deferred consequence is required.", nameof(consequences));
+            data.Add(new DeferredConsequenceSaveData
+            {
+                Id = consequence.Id,
+                DueDay = consequence.DueDay,
+                SourceId = consequence.SourceId,
+                TargetId = consequence.TargetId,
+                EffectId = consequence.EffectId,
+                CandidateId = consequence.CandidateId,
+                Metric = consequence.Metric.ToString(),
+                Magnitude = consequence.Magnitude,
+                Category = consequence.Category.ToString(),
+            });
+        }
+
+        return data.ToArray();
+    }
+
+    public static IReadOnlyList<CampaignDeferredConsequence> RestoreDeferredConsequences(CampaignSaveData saveData)
+    {
+        Validate(saveData);
+        var consequences = new List<CampaignDeferredConsequence>();
+        foreach (DeferredConsequenceSaveData data in saveData.DeferredConsequences)
+        {
+            if (data == null || !Enum.TryParse(data.Metric, out ElectoralMetric metric) ||
+                !Enum.IsDefined(typeof(ElectoralMetric), metric) || !Enum.TryParse(data.Category, out CauseCategory category) ||
+                !Enum.IsDefined(typeof(CauseCategory), category))
+            {
+                throw new InvalidOperationException("The save contains an invalid deferred consequence.");
+            }
+
+            consequences.Add(new CampaignDeferredConsequence(
+                data.Id,
+                data.DueDay,
+                data.SourceId,
+                data.TargetId,
+                data.EffectId,
+                data.CandidateId,
+                metric,
+                data.Magnitude,
+                category));
+        }
+
+        return consequences;
     }
 
     public static IReadOnlyList<PoliticalRelationship> RestoreRelationships(CampaignSaveData saveData)
@@ -388,7 +591,7 @@ public static class CampaignSaveMapper
                 throw new InvalidOperationException("The save contains an invalid decision record.");
             }
 
-            records.Add(new CampaignDecisionRecord(data.Id, data.DecisionId, data.Day, activity, data.ActorId, data.Cost, data.SelectedOptionIds));
+            records.Add(new CampaignDecisionRecord(data.Id, data.DecisionId, data.Day, activity, data.ActorId, data.Cost, data.SelectedOptionIds, data.ContextId));
         }
 
         return records;
@@ -482,6 +685,74 @@ public static class CampaignSaveMapper
             !candidateIds.Contains(outcome.RunoffFirstId) || !candidateIds.Contains(outcome.RunoffSecondId))
         {
             throw new InvalidOperationException("The save contains an invalid runoff election outcome.");
+        }
+    }
+
+    private static void ValidateRunoffResultData(
+        ElectionResultSaveData firstRoundResult,
+        ElectionResultSaveData runoffResult)
+    {
+        if (runoffResult == null) return;
+        if (firstRoundResult == null || firstRoundResult.Outcome == null || firstRoundResult.Outcome.WinnerId != null)
+        {
+            throw new InvalidOperationException("The save contains a runoff result without a pending first-round runoff.");
+        }
+
+        if (runoffResult.Outcome == null || string.IsNullOrWhiteSpace(runoffResult.Outcome.WinnerId) ||
+            runoffResult.Outcome.RunoffFirstId != null || runoffResult.Outcome.RunoffSecondId != null ||
+            runoffResult.Tally == null || runoffResult.Tally.CandidateVotes == null ||
+            runoffResult.Tally.CandidateVotes.Length != 2)
+        {
+            throw new InvalidOperationException("The save contains an invalid runoff result.");
+        }
+
+        var finalistIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (CandidateVoteSaveData candidateVote in runoffResult.Tally.CandidateVotes)
+        {
+            if (candidateVote == null || !finalistIds.Add(candidateVote.CandidateId))
+            {
+                throw new InvalidOperationException("The save contains duplicate runoff finalists.");
+            }
+        }
+
+        if (!finalistIds.Contains(firstRoundResult.Outcome.RunoffFirstId) ||
+            !finalistIds.Contains(firstRoundResult.Outcome.RunoffSecondId) ||
+            !finalistIds.Contains(runoffResult.Outcome.WinnerId))
+        {
+            throw new InvalidOperationException("The save contains runoff candidates that do not match the first round.");
+        }
+    }
+
+    private static void ValidateSliceClosureData(SliceClosureSaveData closure)
+    {
+        if (closure == null) return;
+        if (closure.Day < CampaignSliceClosureResolver.RequiredDecisionDay || closure.Day > CampaignCalendar.TotalCampaignDays)
+        {
+            throw new InvalidOperationException("The save contains an invalid slice closure day.");
+        }
+
+        if (closure.DecisionCount < 1 || closure.DecisiveFactors == null)
+        {
+            throw new InvalidOperationException("The save contains an incomplete slice closure.");
+        }
+
+        ValidateElectionResultData(new ElectionResultSaveData
+        {
+            Tally = closure.Tally,
+            Outcome = closure.Outcome,
+        });
+
+        foreach (CampaignCausalFactorSaveData factor in closure.DecisiveFactors)
+        {
+            if (factor == null || string.IsNullOrWhiteSpace(factor.SourceId) || string.IsNullOrWhiteSpace(factor.EffectId) || factor.Occurrences < 1)
+            {
+                throw new InvalidOperationException("The save contains an invalid slice causal factor.");
+            }
+
+            if (!Enum.TryParse(factor.Category, out CauseCategory category) || !Enum.IsDefined(typeof(CauseCategory), category))
+            {
+                throw new InvalidOperationException("The save contains an invalid slice causal category.");
+            }
         }
     }
 

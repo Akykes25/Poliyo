@@ -9,7 +9,7 @@ using UnityEngine.UI;
 
 namespace Poliyo.Presentation
 {
-/// <summary>Shared decision-scene presenter for rally, interview and negotiation content.</summary>
+/// <summary>Shared decision-scene presenter for authored public, meeting and crisis decisions.</summary>
 public sealed class CampaignDecisionScenePresenter : MonoBehaviour
 {
     private enum TimerMode
@@ -97,6 +97,12 @@ public sealed class CampaignDecisionScenePresenter : MonoBehaviour
     private void Start()
     {
         _host = CampaignGameSessionHost.Current ?? throw new InvalidOperationException("A decision scene requires a campaign session host.");
+        CampaignActivity? pendingActivity = CampaignGameSessionHost.ConsumePendingDecisionActivity();
+        if (pendingActivity.HasValue)
+        {
+            _activity = pendingActivity.Value;
+        }
+
         if (!_host.Session.TeamSelectionCompleted)
         {
             _statusLabel.text = "Confirmá la elección inicial del equipo antes de resolver una escena política.";
@@ -111,12 +117,14 @@ public sealed class CampaignDecisionScenePresenter : MonoBehaviour
 
         _sceneTitle.text = GetActivityTitle(_activity);
         _timerMode = TimerMode.Normal;
+        string pendingScenarioId = CampaignGameSessionHost.ConsumePendingDecisionScenarioId();
         LoadVariants();
         RefreshVariantButtons();
         if (_variantIds.Count > 0)
         {
-            SelectVariant(_variantIds[0]);
-            FocusButton(_variantButtons.Length > 0 ? _variantButtons[0] : null);
+            int selectedVariantIndex = FindVariantIndex(pendingScenarioId);
+            SelectVariant(_variantIds[selectedVariantIndex]);
+            FocusButton(selectedVariantIndex < _variantButtons.Length ? _variantButtons[selectedVariantIndex] : null);
         }
         else
         {
@@ -200,6 +208,7 @@ public sealed class CampaignDecisionScenePresenter : MonoBehaviour
         CampaignDecisionOptionDefinition option = options[optionIndex];
         _riskLabel.text = option.RiskLabel + " · " + option.Description;
         _costLabel.text = FormatCost(GetPreviewCost(optionIndex));
+        _reactionLabel.text = FormatPreviewReaction(option);
         _statusLabel.text = "Respuesta seleccionada. Confirmá para fijarla en la memoria de campaña.";
         SetInteractable(_confirmButton, true);
     }
@@ -329,15 +338,58 @@ public sealed class CampaignDecisionScenePresenter : MonoBehaviour
         }
     }
 
+    private int FindVariantIndex(string scenarioId)
+    {
+        if (!string.IsNullOrWhiteSpace(scenarioId))
+        {
+            for (var index = 0; index < _variantIds.Count; index++)
+            {
+                if (string.Equals(_variantIds[index], scenarioId, StringComparison.Ordinal))
+                {
+                    return index;
+                }
+            }
+        }
+
+        return 0;
+    }
+
     private decimal GetPreviewCost(int optionIndex)
     {
         decimal cost = _scenario == null ? 0m : ToSimulationDecimal(_scenario.BaseCost);
-        if (optionIndex >= 0 && _scenario.Steps[_stepIndex].Options[optionIndex] != null)
+        if (_scenario == null || _scenario.Steps == null)
+        {
+            return Math.Max(0m, cost);
+        }
+
+        for (var stepIndex = 0; stepIndex < _selectedOptionIds.Count && stepIndex < _scenario.Steps.Length; stepIndex++)
+        {
+            CampaignDecisionOptionDefinition selectedOption = FindOption(_scenario.Steps[stepIndex], _selectedOptionIds[stepIndex]);
+            if (selectedOption != null)
+            {
+                cost += ToSimulationDecimal(selectedOption.CostModifier);
+            }
+        }
+
+        if (optionIndex >= 0 && _stepIndex < _scenario.Steps.Length && _scenario.Steps[_stepIndex] != null &&
+            _scenario.Steps[_stepIndex].Options != null && optionIndex < _scenario.Steps[_stepIndex].Options.Length &&
+            _scenario.Steps[_stepIndex].Options[optionIndex] != null)
         {
             cost += ToSimulationDecimal(_scenario.Steps[_stepIndex].Options[optionIndex].CostModifier);
         }
 
         return Math.Max(0m, cost);
+    }
+
+    private static CampaignDecisionOptionDefinition FindOption(CampaignDecisionStepDefinition step, string optionId)
+    {
+        if (step == null || step.Options == null) return null;
+        foreach (CampaignDecisionOptionDefinition option in step.Options)
+        {
+            if (option != null && option.Id == optionId) return option;
+        }
+
+        return null;
     }
 
     private string BuildReactionSummary()
@@ -347,14 +399,38 @@ public sealed class CampaignDecisionScenePresenter : MonoBehaviour
         {
             foreach (CampaignDecisionStepDefinition step in _scenario.Steps)
             {
+                if (step == null || step.Options == null) continue;
                 foreach (CampaignDecisionOptionDefinition option in step.Options)
                 {
-                    if (option != null && option.Id == optionId) reactions.Add(option.ImmediateReaction);
+                    if (option == null || option.Id != optionId) continue;
+                    if (!string.IsNullOrWhiteSpace(option.ImmediateReaction)) reactions.Add("Reacción inmediata · " + option.ImmediateReaction);
+                    if (!string.IsNullOrWhiteSpace(option.RivalResponse)) reactions.Add("Rival · " + option.RivalResponse);
+                    if (option.DeferredImpactDelta != 0f)
+                    {
+                        string metric = string.IsNullOrWhiteSpace(option.DeferredMetricId) ? "tablero" : option.DeferredMetricId;
+                        reactions.Add("Consecuencia diferida · " + metric + " · día +" + Math.Max(1, option.DeferredDayOffset));
+                    }
                 }
             }
         }
 
-        return string.Join("\n", reactions.ToArray());
+        return reactions.Count == 0 ? "La decisión quedó registrada y su efecto se explicará en el tablero." : string.Join("\n", reactions.ToArray());
+    }
+
+    private static string FormatPreviewReaction(CampaignDecisionOptionDefinition option)
+    {
+        if (option == null)
+        {
+            return "La reacción se mostrará después de confirmar.";
+        }
+
+        string immediateReaction = string.IsNullOrWhiteSpace(option.ImmediateReaction)
+            ? "La campaña conserva esta señal para el cierre."
+            : option.ImmediateReaction;
+        string rivalResponse = string.IsNullOrWhiteSpace(option.RivalResponse)
+            ? string.Empty
+            : "\nRival · " + option.RivalResponse;
+        return "Reacción prevista · " + immediateReaction + rivalResponse;
     }
 
     private void ResetTimer()
@@ -421,6 +497,8 @@ public sealed class CampaignDecisionScenePresenter : MonoBehaviour
             case CampaignActivity.Rally: return "Acto político";
             case CampaignActivity.Interview: return "Entrevista periodística";
             case CampaignActivity.Negotiation: return "Negociación política";
+            case CampaignActivity.WeeklyMeeting: return "Mesa semanal de campaña";
+            case CampaignActivity.Crisis: return "Crisis del día";
             default: return activity.ToString();
         }
     }

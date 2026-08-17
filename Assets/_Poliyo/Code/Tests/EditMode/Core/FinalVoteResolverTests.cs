@@ -83,13 +83,35 @@ public sealed class FinalVoteResolverTests
         Assert.That(improvedResult.GetCandidateShare("player"), Is.GreaterThan(baselineResult.GetCandidateShare("player")));
     }
 
+    [Test]
+    public void ResolveRunoff_UsesOnlyFinalistsAndRedistributesEliminatedSupport()
+    {
+        MicroElector elector = new MicroElector("elector", "capital", 100m, 100m, new[]
+        {
+            new CandidateElectoralState("player", 60m, 40m, 10m),
+            new CandidateElectoralState("rival", 30m, 25m, 20m),
+            new CandidateElectoralState("eliminated", 20m, 25m, 35m),
+        }, blankVoteIntention: 5m, undecidedIntention: 5m);
+
+        FinalVoteDistribution result = FinalVoteResolver.ResolveRunoff(
+            elector,
+            new[] { "player", "rival" },
+            new CampaignSeed(17UL),
+            Parameters);
+
+        Assert.That(result.CandidateShares.Keys, Is.EquivalentTo(new[] { "player", "rival" }));
+        Assert.That(result.GetCandidateShare("player") + result.GetCandidateShare("rival") + result.BlankShare,
+            Is.EqualTo(100m));
+        Assert.That(result.GetCandidateShare("player"), Is.GreaterThan(40m));
+    }
+
     private static MicroElector CreateElector(decimal playerTrust, decimal playerRejection)
     {
         return new MicroElector("elector", "capital", 100m, 100m, new[]
         {
-            new CandidateElectoralState("player", playerTrust, 42m, playerRejection),
-            new CandidateElectoralState("rival", 50m, 38m, 30m),
-        }, blankVoteIntention: 8m, undecidedIntention: 12m);
+            new CandidateElectoralState("player", playerTrust, 75m, playerRejection),
+            new CandidateElectoralState("rival", 15m, 15m, 30m),
+        }, blankVoteIntention: 5m, undecidedIntention: 5m);
     }
 }
 }
